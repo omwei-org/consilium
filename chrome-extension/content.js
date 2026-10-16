@@ -1,58 +1,13 @@
 'use strict';
-
-const PROTOCOL_VERSION = 1;
-function providerFromLocation() {
-  const host = location.hostname;
-  if (host === 'chatgpt.com' || host.endsWith('.chatgpt.com')) return 'chatgpt';
-  if (host === 'claude.ai' || host.endsWith('.claude.ai')) return 'claude';
-  return null;
-}
-function findComposer(provider) {
-  // These selectors are intentionally conservative and need verification against
-  // current provider DOMs. If no unique editable element is found, fail closed.
-  const selectors = provider === 'chatgpt'
-    ? ['#prompt-textarea', 'textarea[data-testid="prompt-textarea"]', '[contenteditable="true"][data-placeholder]']
-    : ['div[contenteditable="true"][data-placeholder]', 'div[contenteditable="true"][role="textbox"]', 'textarea'];
-  const candidates = [];
-  for (const selector of selectors) {
-    for (const element of document.querySelectorAll(selector)) {
-      if (!element.isConnected || element.getAttribute('aria-hidden') === 'true') continue;
-      const rect = element.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0 && !element.hasAttribute('disabled')) candidates.push(element);
-    }
-    if (candidates.length) break;
-  }
-  const unique = [...new Set(candidates)];
-  return unique.length === 1 ? unique[0] : null;
-}
-function setEditableText(element, text) {
-  element.focus();
-  if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
-    const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value')?.set;
-    if (!setter) throw new Error('Could not set text in the detected input.');
-    setter.call(element, text);
-    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-  } else if (element.isContentEditable) {
-    element.replaceChildren(document.createTextNode(text));
-    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-  } else throw new Error('Detected element is not editable.');
-}
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  try {
-    if (sender.id !== chrome.runtime.id || !message || message.protocolVersion !== PROTOCOL_VERSION || message.type !== 'CONSILIUM_PROVIDER_PREPARE') {
-      sendResponse({ ok: false, error: 'Invalid internal extension message.' }); return;
-    }
-    const provider = providerFromLocation();
-    const payload = message.payload;
-    if (!provider || provider !== payload?.recipient) { sendResponse({ ok: false, error: 'Provider identity mismatch.' }); return; }
-    if (typeof payload.content !== 'string' || !payload.content.trim() || payload.content.length > 30000) { sendResponse({ ok: false, error: 'Invalid message content.' }); return; }
-    const composer = findComposer(provider);
-    if (!composer) { sendResponse({ ok: false, error: 'Could not identify exactly one supported message composer. No action taken.' }); return; }
-    setEditableText(composer, payload.content);
-    sendResponse({ ok: true, status: 'prepared_for_manual_send', provider, detail: 'Message entered into composer. Review and click Send manually.' });
-  } catch (error) {
-    sendResponse({ ok: false, error: error.message || 'Provider adapter failed.' });
-  }
-  return true;
-});
+const VERSION=1, LIMIT=30000;
+let prepared=null, previous='', timer=null, observer=null;
+const provider=()=>location.hostname==='chatgpt.com'||location.hostname.endsWith('.chatgpt.com')?'chatgpt':location.hostname==='claude.ai'||location.hostname.endsWith('.claude.ai')?'claude':null;
+const visible=e=>{const r=e.getBoundingClientRect();return e.isConnected&&e.getAttribute('aria-hidden')!=='true'&&r.width>0&&r.height>0};
+const text=e=>(e?.innerText||e?.textContent||'').replace(/\s+/g,' ').trim();
+function findComposer(p){const ss=p==='chatgpt'?['#prompt-textarea','textarea[data-testid="prompt-textarea"]','[contenteditable="true"][data-placeholder]']:['div[contenteditable="true"][data-placeholder]','div[contenteditable="true"][role="textbox"]','textarea'];for(const s of ss){const a=[...document.querySelectorAll(s)].filter(e=>visible(e)&&!e.disabled);if(a.length)return a.length===1?a[0]:null;}return null;}
+function setText(e,t){e.focus();if(e instanceof HTMLTextAreaElement||e instanceof HTMLInputElement){const set=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(e),'value')?.set;if(!set)throw Error('Cannot set composer value');set.call(e,t);}else if(e.isContentEditable)e.replaceChildren(document.createTextNode(t));else throw Error('Composer is not editable');e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:t}));}
+function nodes(p,kind){const ss=p==='chatgpt'?(kind==='assistant'?['[data-message-author-role="assistant"]']:['[data-message-author-role="user"]']):(kind==='assistant'?['[data-testid*="assistant-message"]']:['[data-testid*="user-message"]','[data-testid*="human-turn"]']);for(const s of ss){const a=[...document.querySelectorAll(s)].filter(visible);if(a.length)return a;}return [];}
+function busy(p){const ss=p==='chatgpt'?['button[data-testid="stop-button"]','button[aria-label*="Stop generating" i]']:['button[aria-label*="Stop response" i]','button[aria-label*="Stop generating" i]'];return ss.some(s=>[...document.querySelectorAll(s)].some(visible));}
+function watch(p){observer?.disconnect();const a=nodes(p,'assistant');previous=text(a[a.length-1]);observer=new MutationObserver(()=>inspect(p));observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['disabled','aria-label','data-testid']});}
+function inspect(p){if(!prepared)return;if(!prepared.sent){const prompt=prepared.content.replace(/\s+/g,' ').trim();if(nodes(p,'user').some(e=>text(e)===prompt||(prompt.length>160&&text(e).includes(prompt.slice(0,160))))){prepared.sent=true;const a=nodes(p,'assistant');previous=text(a[a.length-1]);}return;}const a=nodes(p,'assistant'),latest=text(a[a.length-1]);if(!latest||latest===previous||busy(p)){clearTimeout(timer);timer=null;return;}clearTimeout(timer);timer=setTimeout(()=>{const b=nodes(p,'assistant'),answer=text(b[b.length-1]);if(!prepared||!prepared.sent||!answer||answer===previous||busy(p))return;const item={dispatchId:prepared.dispatchId,recipient:p,content:answer,capturedAt:new Date().toISOString()};previous=answer;prepared=null;chrome.runtime.sendMessage({protocolVersion:VERSION,type:'CONSILIUM_CAPTURED_RESPONSE',payload:item},r=>{void chrome.runtime.lastError;if(!r?.ok)console.warn('Consilium capture rejected');});},2200);}
+chrome.runtime.onMessage.addListener((m,s,reply)=>{try{if(s.id!==chrome.runtime.id||m?.protocolVersion!==VERSION||m?.type!=='CONSILIUM_PROVIDER_PREPARE')throw Error('Invalid internal message');const p=provider(),d=m.payload;if(!p||p!==d?.recipient||typeof d.content!=='string'||!d.content.trim()||d.content.length>LIMIT||typeof d.dispatchId!=='string')throw Error('Invalid provider or content');const c=findComposer(p);if(!c)throw Error('Could not identify exactly one supported composer');setText(c,d.content);prepared={dispatchId:d.dispatchId,content:d.content,sent:false};watch(p);reply({ok:true,status:'prepared_for_manual_send',provider:p,detail:'Review and click Send manually; response capture is experimental'});}catch(e){reply({ok:false,error:e.message||'Provider adapter failed'});}return true;});
