@@ -22,6 +22,7 @@ assert.match(app, /isDispatching\s*=\s*true/, 'overlapping dispatch sequences mu
 assert.match(app, /content\.length>MAX_CONTENT_CHARS/, 'oversized full context must fail closed');
 assert.match(app, /m\.kind==='response'\|\|m\.kind==='moderator_instruction'/, 'future context must include responses and moderator instructions');
 assert.match(app, /async function saveManualResponse/, 'manual response capture must be implemented');
+assert.match(app, /This response is already saved for the current round/, 'duplicate response capture must be prevented');
 assert.match(html, /id="save-chatgpt"/, 'ChatGPT response control must exist in HTML');
 assert.match(html, /id="save-claude"/, 'Claude response control must exist in HTML');
 const bg = read('chrome-extension/background.js');
