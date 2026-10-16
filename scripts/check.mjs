@@ -173,6 +173,8 @@ assert.match(noTabApprove.error,/No chatgpt tab found/,'no-tab failure must be e
 providerTabs.push({id:11,url:'https://chatgpt.com/',title:'ChatGPT'});
 const stillPending=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_LIST_PENDING'},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
 assert.ok(!stillPending.pending.some(p=>p.dispatchId===multiId)&&stillPending.pending.some(p=>p.dispatchId===noTabId),'rejected request should be removed while failed no-tab preflight remains visible');
+const rejectNoTab=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_REJECT',dispatchId:noTabId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(rejectNoTab.ok,true,'failed no-tab request can be explicitly rejected after inspection');
 const raceId='32345678-1234-1234-1234-123456789012';
 const raceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:raceId}},sender);
 assert.equal(raceStage.ok,true,'race-test request should stage');
