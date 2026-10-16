@@ -40,7 +40,7 @@ The hosted UI's IndexedDB round ledger and the extension's `chrome.storage.local
 
 ## Monotonic reconciliation
 
-Reconciliation must not let a stale extension status snapshot overwrite a more advanced local dispatch state. Known terminal extension outcomes (`cancelled_before_approval`, `rejected_before_approval`) take precedence over stale nonterminal local states. Conversely, a locally observed terminal outcome is preserved if the extension snapshot is older or no longer contains the record. A locally observed `prepared_for_manual_send` cannot be rolled back to `awaiting_extension_approval`; an `outcome_unknown` or manually reviewed-but-still-unknown state cannot be resolved by a pending-only snapshot. This monotonicity protects UI state from stale reads but is not proof of provider delivery.
+Reconciliation must not let a stale extension status snapshot overwrite a more advanced local dispatch state. Known terminal extension outcomes (`cancelled_before_approval`, `rejected_before_approval`) take precedence over stale nonterminal local states. Conversely, a locally observed terminal outcome is preserved if the extension snapshot is older or no longer contains the record. A locally observed `prepared_for_manual_send` cannot be rolled back by any nonterminal or missing-record snapshot; only an explicit terminal extension outcome can supersede it. An `outcome_unknown` or manually reviewed-but-still-unknown state cannot be resolved by a pending-only snapshot. This monotonicity protects UI state from stale reads but is not proof of provider delivery.
 
 ## Live-browser validation
 
