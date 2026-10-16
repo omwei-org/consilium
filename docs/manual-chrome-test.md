@@ -61,6 +61,17 @@ For each case record **PASS**, **FAIL**, or **BLOCKED**, and attach a redacted s
 - [ ] E3 — Verify an oversized prompt is refused with a clear error; context is not silently summarized or truncated.
 - [ ] E4 — Export a session and verify that the file contains the expected history. Treat the export as sensitive local data.
 
+### F. Manual fallback without extension dispatch
+
+- [ ] F1 — Start a harmless test session and leave the extension ID unconfigured or use the UI without extension connectivity. Choose “Prepare manually for ChatGPT”; verify the dialog shows the complete prompt with the original intent and moderator instruction.
+- [ ] F2 — Copy the prompt and paste it into ChatGPT yourself. Verify Consilium does not open a provider tab or click Send.
+- [ ] F3 — Save ChatGPT's response using the manual response field. Verify the session stays on the same active manual round and the round is not marked complete after only one response.
+- [ ] F4 — Refresh Consilium, select the same session, and choose “Prepare manually for Claude”. Verify the prompt is byte-for-byte identical to the saved prompt for this round, even though the first response is now in history.
+- [ ] F5 — Paste and send the prompt to Claude yourself, save Claude's response, and verify the round becomes complete only after both provider responses are recorded for that round.
+- [ ] F6 — Start another manual round with a moderator instruction. Verify the instruction appears in the prompt and is recorded once in local history; verify the next round includes the prior round's substantive responses and instruction.
+- [ ] F7 — Start an extension-managed round and leave it unresolved. Attempt manual fallback; it must refuse to bypass the unresolved extension dispatch.
+- [ ] F8 — Test clipboard denial/unavailability. The prompt should remain selectable for manual copying, with no claim that it was copied.
+
 ## Result record
 
 - Date/time and timezone:
@@ -73,6 +84,7 @@ For each case record **PASS**, **FAIL**, or **BLOCKED**, and attach a redacted s
 - Claude test result (A–E):
 - Failures / console errors (redacted):
 - Evidence filenames (redacted):
+- Manual fallback result (F):
 - Overall: **NOT RUN / PASS / FAIL / BLOCKED**
 - Follow-up issue links:
 
