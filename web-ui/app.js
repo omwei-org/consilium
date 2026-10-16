@@ -12,7 +12,7 @@ function store(mode, fn) { return new Promise((resolve,reject)=>{const tx=db.tra
 async function saveSession() { if(!active)return;active.updatedAt=iso();await store('readwrite',s=>s.put(active));renderSessions(); }
 async function loadSessions() { sessions=await new Promise((resolve,reject)=>{const tx=db.transaction('sessions','readonly');const req=tx.objectStore('sessions').getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});sessions.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));renderSessions(); }
 function renderSessions(){const el=$('sessions');el.replaceChildren();if(!sessions.length){el.textContent='No saved sessions yet.';return;}for(const s of sessions){const b=document.createElement('button');b.className='session-button';b.textContent=s.title||'Untitled session';const date=document.createElement('span');date.textContent=new Date(s.updatedAt).toLocaleString();b.append(' ',date);b.addEventListener('click',()=>activate(s.id));el.append(b);}}
-function renderActive(){if(!active)return;$('workspace').hidden=false;const recovery=active.pendingRound&&!['complete','abandoned'].includes(active.pendingRound.status);$('recovery-panel').hidden=!recovery;if(recovery){const ds=active.pendingRound.dispatches||[];const states=ds.map(d=>(d.provider||'provider')+': '+(d.status||'unknown')).join(' · ');$('recovery-summary').textContent='Round '+active.pendingRound.round+' · '+active.pendingRound.status+' · '+ds.length+' tracked dispatch(es)'+(states?' — '+states:'')+'. No dispatch will be retried automatically.';}$('session-title').textContent=active.title;$('intent-summary-text').textContent=active.intent;$('count').textContent=active.messages.length+' messages';const timeline=$('timeline');timeline.replaceChildren();for(const m of active.messages){const li=document.createElement('li');const title=document.createElement('strong');title.textContent=(m.sender||m.recipient||'Note')+' · ';const content=document.createElement('span');content.textContent=m.content;li.append(title,content);timeline.append(li);}for(const p of PROVIDERS){const last=[...active.messages].reverse().find(m=>m.sender===p);$(p+'-response').textContent=last?last.content:'No response captured yet.';$(p+'-state').textContent=last?'Response captured locally':'Waiting for a manual response';}}
+function renderActive(){if(!active)return;$('workspace').hidden=false;const recovery=active.pendingRound&&active.pendingRound.mode!=='manual_fallback'&&!['complete','abandoned'].includes(active.pendingRound.status);$('recovery-panel').hidden=!recovery;if(recovery){const ds=active.pendingRound.dispatches||[];const states=ds.map(d=>(d.provider||'provider')+': '+(d.status||'unknown')).join(' · ');$('recovery-summary').textContent='Round '+active.pendingRound.round+' · '+active.pendingRound.status+' · '+ds.length+' tracked dispatch(es)'+(states?' — '+states:'')+'. No dispatch will be retried automatically.';}$('session-title').textContent=active.title;$('intent-summary-text').textContent=active.intent;$('count').textContent=active.messages.length+' messages';const timeline=$('timeline');timeline.replaceChildren();for(const m of active.messages){const li=document.createElement('li');const title=document.createElement('strong');title.textContent=(m.sender||m.recipient||'Note')+' · ';const content=document.createElement('span');content.textContent=m.content;li.append(title,content);timeline.append(li);}for(const p of PROVIDERS){const last=[...active.messages].reverse().find(m=>m.sender===p);$(p+'-response').textContent=last?last.content:'No response captured yet.';$(p+'-state').textContent=last?'Response captured locally':'Waiting for a manual response';}}
 async function activate(id){active=sessions.find(s=>s.id===id);if(active)renderActive();}
 async function createSession(intent){active={id:uid(),title:intent.trim().slice(0,64),intent:intent.trim(),createdAt:iso(),updatedAt:iso(),messages:[],round:0};sessions.unshift(active);await saveSession();renderActive();}
 function buildPrompt(){return ConsiliumCore.buildPrompt(active.intent,active.messages,$('instruction').value);}
@@ -68,16 +68,33 @@ $('prepare-round').addEventListener('click',async()=>{
 });
 
 let manualFallbackProvider=null;
-function openManualFallback(provider){
+async function openManualFallback(provider){
  if(!active){toast('Start or select a session first.');return;}
- let content;try{content=buildPrompt();}catch(err){toast(err.message||'Could not build prompt.');return;}
+ let content;
+ const current=active.pendingRound;
+ if(current&&!['complete','abandoned'].includes(current.status)){
+  if(current.mode!=='manual_fallback'){toast('Resolve the active extension round first. Do not bypass an unresolved dispatch.');return;}
+  content=current.promptContent;
+  if(typeof content!=='string'||!content){toast('The saved manual-round prompt is unavailable. Export the session and inspect its history before proceeding.');return;}
+ }else{
+  try{content=buildPrompt();}catch(err){toast(err.message||'Could not build prompt.');return;}
+  if(content.length>MAX_CONTENT_CHARS){toast('Full context exceeds the supported size. Nothing was prepared; export or start a separate session.');return;}
+  const round=active.round+1;
+  const instruction=$('instruction').value.trim();
+  active.round=round;
+  if(instruction)active.messages.push({id:uid(),round,sender:'moderator',kind:'moderator_instruction',content:instruction,createdAt:iso(),status:'recorded'});
+  active.pendingRound={round,status:'awaiting_manual_responses',mode:'manual_fallback',promptContent:content,startedAt:iso(),updatedAt:iso(),dispatches:[]};
+  $('instruction').value='';
+  try{await saveSession();}catch(err){toast('Could not save manual round: '+err.message);return;}
+  renderActive();
+ }
  manualFallbackProvider=provider;
  $('manual-recipient').textContent=provider==='chatgpt'?'ChatGPT':'Claude';
  $('manual-content').value=content;
  $('manual-fallback').showModal();
 }
-$('manual-chatgpt').addEventListener('click',()=>openManualFallback('chatgpt'));
-$('manual-claude').addEventListener('click',()=>openManualFallback('claude'));
+$('manual-chatgpt').addEventListener('click',()=>openManualFallback('chatgpt').catch(e=>toast('Could not prepare manual prompt: '+e.message)));
+$('manual-claude').addEventListener('click',()=>openManualFallback('claude').catch(e=>toast('Could not prepare manual prompt: '+e.message)));
 $('manual-select').addEventListener('click',()=>{$('manual-content').focus();$('manual-content').select();toast('Prompt selected. Copy it and paste it into '+(manualFallbackProvider==='chatgpt'?'ChatGPT':'Claude')+'.');});
 $('manual-copy').addEventListener('click',async()=>{
  const content=$('manual-content').value;if(!content){toast('No prompt to copy.');return;}
