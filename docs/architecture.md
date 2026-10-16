@@ -30,6 +30,10 @@ Keep original intent, prior moderator instructions and manually captured assista
 
 Follow [the manual Chrome integration checklist](manual-chrome-test.md). It is an unexecuted test plan, not evidence of a live-browser pass.
 
+## Approval ordering
+
+Oldest-first approval is enforced both by the popup UI and by the extension background handler, so a direct or stale popup message cannot bypass ordering. The behavioral suite verifies that an out-of-order approval is refused and the next request can proceed only after the oldest is resolved.
+
 ## Test coverage boundary
 
 The content adapter has mock-DOM behavioral tests for exact text insertion, preservation of an existing draft, ambiguous composers and recipient mismatch; these do not validate current provider DOM selectors.
