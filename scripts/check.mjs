@@ -161,6 +161,8 @@ const multiApprove=await invoke(internalHandler,{protocolVersion:1,type:'CONSILI
 assert.equal(multiApprove.ok,false,'approval must fail when multiple provider tabs match');
 assert.match(multiApprove.error,/Multiple chatgpt tabs/,'multiple-tab failure must be explicit');
 providerTabs.pop();
+const rejectAmbiguous=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_REJECT',dispatchId:multiId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(rejectAmbiguous.ok,true,'ambiguous multiple-tab request can be explicitly rejected');
 const noTabId='52345678-1234-1234-1234-123456789012';
 const noTabStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:noTabId}},sender);
 assert.equal(noTabStage.ok,true,'no-tab test request should stage');
@@ -170,7 +172,7 @@ assert.equal(noTabApprove.ok,false,'approval must fail when provider tab is abse
 assert.match(noTabApprove.error,/No chatgpt tab found/,'no-tab failure must be explicit');
 providerTabs.push({id:11,url:'https://chatgpt.com/',title:'ChatGPT'});
 const stillPending=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_LIST_PENDING'},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
-assert.ok(stillPending.pending.some(p=>p.dispatchId===multiId)&&stillPending.pending.some(p=>p.dispatchId===noTabId),'failed preflight must leave unresolved requests visible for manual resolution');
+assert.ok(!stillPending.pending.some(p=>p.dispatchId===multiId)&&stillPending.pending.some(p=>p.dispatchId===noTabId),'rejected request should be removed while failed no-tab preflight remains visible');
 const raceId='32345678-1234-1234-1234-123456789012';
 const raceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:raceId}},sender);
 assert.equal(raceStage.ok,true,'race-test request should stage');
