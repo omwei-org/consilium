@@ -22,7 +22,9 @@ async function stage(payload){
  if(typeof content!=='string'||!content.trim()||content.length>MAX_CONTENT_CHARS)throw Error('Content is empty or too large.');
  if(typeof contentHash!=='string'||! /^[a-f0-9]{64}$/.test(contentHash)||await hashContent(content)!==contentHash)throw Error('Content hash mismatch.');
  if(attempt!==1)throw Error('Automatic retries are not supported.');
- const key='consilium.dispatch.'+dispatchId, existing=await chrome.storage.local.get([key,PENDING_KEY]);
+ const key='consilium.dispatch.'+dispatchId, existing=await chrome.storage.local.get([key,PENDING_KEY,ATTEMPTS_KEY]);
+ const unresolved=Object.values(existing[ATTEMPTS_KEY]||{}).filter(x=>x.state==='preparing'||x.state==='outcome_unknown');
+ if(unresolved.length)throw Error('An earlier dispatch has an unknown outcome. Inspect the provider tab and resolve it in the extension popup before staging more requests.');
  if(existing[key])throw Error('Dispatch ID already consumed; manual review required.');
  const pending=existing[PENDING_KEY]||{};
  if(pending[dispatchId])throw Error('Dispatch ID is already awaiting extension approval.');
@@ -36,7 +38,9 @@ async function dispatchApproved(dispatchId){
  if(inFlightDispatches.has(dispatchId))throw Error('Dispatch already in progress; manual review required.');
  inFlightDispatches.add(dispatchId);
  try {
- const state=await chrome.storage.local.get([PENDING_KEY]);
+ const state=await chrome.storage.local.get([PENDING_KEY,ATTEMPTS_KEY]);
+ const unresolved=Object.values(state[ATTEMPTS_KEY]||{}).filter(x=>x.state==='preparing'||x.state==='outcome_unknown');
+ if(unresolved.length)throw Error('An earlier dispatch has an unknown outcome. Resolve it after manual provider-tab inspection before approving another request.');
  const pending=state[PENDING_KEY]||{};
  const ordered=Object.values(pending).sort((a,b)=>String(a.stagedAt).localeCompare(String(b.stagedAt)));
  if(ordered.length&&ordered[0].dispatchId!==dispatchId)throw Error('Resolve the oldest pending request first.');
@@ -67,6 +71,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message.type==='CONSILIUM_POPUP_LIST_PENDING'){const s=await chrome.storage.local.get([PENDING_KEY,ATTEMPTS_KEY]);return {ok:true,pending:Object.values(s[PENDING_KEY]||{}).map(p=>({dispatchId:p.dispatchId,recipient:p.recipient,sessionId:p.sessionId,roundId:p.roundId,content:p.content,stagedAt:p.stagedAt})),unresolvedAttempts:Object.values(s[ATTEMPTS_KEY]||{}).filter(x=>x.state==='preparing'||x.state==='outcome_unknown')};}
   if(message.type==='CONSILIUM_POPUP_APPROVE'){return {ok:true,...await dispatchApproved(message.dispatchId)};}
   if(message.type==='CONSILIUM_POPUP_REJECT'){if(inFlightDispatches.has(message.dispatchId))throw Error('This request is already being approved; inspect the provider tab before taking another action.');const s=await chrome.storage.local.get(PENDING_KEY),pending=s[PENDING_KEY]||{};if(!pending[message.dispatchId])throw Error('Pending request no longer exists.');delete pending[message.dispatchId];await chrome.storage.local.set({[PENDING_KEY]:pending});return {ok:true,status:'rejected'};}
+  if(message.type==='CONSILIUM_POPUP_RESOLVE_UNKNOWN'){const id=message.dispatchId;if(typeof id!=='string')throw Error('Invalid dispatch ID.');const s=await chrome.storage.local.get(ATTEMPTS_KEY),all=s[ATTEMPTS_KEY]||{},record=all[id];if(!record||!['preparing','outcome_unknown'].includes(record.state))throw Error('No unresolved attempt found for this dispatch.');if(message.confirmation!=='inspected_provider_tabs')throw Error('Manual provider-tab inspection confirmation is required.');all[id]={...record,state:'manually_reviewed',resolution:'operator_confirmed_provider_tabs_inspected',resolvedAt:new Date().toISOString(),updatedAt:new Date().toISOString()};await chrome.storage.local.set({[ATTEMPTS_KEY]:all});return {ok:true,status:'manually_reviewed'};}
   throw Error('Unsupported internal action.');
  })().then(sendResponse).catch(e=>sendResponse(responseError(e.message||'Unknown extension error.')));
  return true;
