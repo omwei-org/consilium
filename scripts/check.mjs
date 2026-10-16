@@ -104,6 +104,9 @@ assert.doesNotMatch(content, /MutationObserver|CONSILIUM_CAPTURED_RESPONSE|captu
 assert.match(app, /catch\(err\)\{toast\(err\.message\|\|'Could not build prompt\. Nothing was sent\.'\);return;\}/, 'prompt-size and construction errors must be handled in the UI');
 assert.match(app, /\$\('instruction'\)\.value='';/, 'a recorded moderator instruction must not be silently reused next round');
 assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core must load before the app');
+assert.match(html, /id="round-status-text"/, 'visible current-round status must be present');
+assert.match(app, /currentResponses=PROVIDERS\.filter\(p=>active\.messages\.some\(m=>m\.sender===p&&m\.kind==='response'&&Number\(m\.round\)===currentRound\)\)/, 'round summary must count only responses belonging to the current round');
+assert.match(app, /currentResponses\.length\+' of 2 responses recorded'/, 'round summary must clearly show response progress');
 assert.match(app, /const currentRound=Number\(active\.pendingRound\?\.round\?\?active\.round\)/, 'provider status must use the active round, not merely any historical response');
 assert.match(app, /Response saved for round '\+currentRound/, 'provider status must identify a response saved for the current round');
 assert.match(app, /Waiting for response for round '\+currentRound/, 'provider status must show when the current round still lacks a response');
