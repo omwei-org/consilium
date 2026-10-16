@@ -68,6 +68,9 @@ assert.match(app, /pendingRound=\{round,status:'preparing'/, 'round recovery sta
 assert.match(html, /Reconcile extension state/, 'recovery UI must offer extension reconciliation');
 assert.match(app, /No dispatch will be retried automatically/, 'recovery must explicitly prohibit automatic retry');
 assert.match(app, /Resolve the current round first/, 'new rounds must wait until the previous round is complete');
+assert.match(html, /Close round after manual review/, 'interrupted round must have an explicit manual closure path');
+assert.match(app, /Moderator manually abandoned this round after inspecting provider state/, 'manual closure must be recorded in the local audit trail');
+assert.match(app, /if\(active\.pendingRound&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)\)/, 'only completed or manually abandoned rounds may be followed by a new round');
 assert.match(bg, /pendingDispatches:Object\.values\(pending\)/, 'extension status must expose pending dispatch metadata for reconciliation');
 const content = read('chrome-extension/content.js');
 assert.doesNotMatch(content, /\.click\(\)/, 'content script must not auto-click provider Send');
