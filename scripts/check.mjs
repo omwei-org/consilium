@@ -86,6 +86,8 @@ assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core mu
 const { webcrypto } = await import('node:crypto');
 const extensionStorage = {};
 let externalHandler, internalHandler;
+let holdPrepare=false, releasePrepare=()=>{}, prepareStartedResolve=()=>{};
+let prepareStarted=new Promise(resolve=>{prepareStartedResolve=resolve;});
 const providerTabs = [{id:11,url:'https://chatgpt.com/',title:'ChatGPT'}];
 const chromeMock = {
   runtime: {
@@ -102,7 +104,7 @@ const chromeMock = {
   tabs:{
     async query(){return providerTabs.map(x=>({...x}));},
     async get(id){const t=providerTabs.find(x=>x.id===id);if(!t)throw Error('tab missing');return {...t};},
-    async sendMessage(id,message){assert.equal(id,11);assert.equal(message.type,'CONSILIUM_PROVIDER_PREPARE');return {ok:true,status:'prepared_for_manual_send'};}
+    async sendMessage(id,message){assert.equal(id,11);assert.equal(message.type,'CONSILIUM_PROVIDER_PREPARE');if(holdPrepare){prepareStartedResolve();await new Promise(resolve=>{releasePrepare=resolve;});}return {ok:true,status:'prepared_for_manual_send'};}
   }
 };
 const extensionSandbox={chrome:chromeMock,crypto:webcrypto,TextEncoder,URL,Date,Set,Map,Object,Array,String,Error,RegExp,Promise};
@@ -134,6 +136,21 @@ const cancelResult=await invoke(externalHandler,{protocolVersion:1,type:'CONSILI
 assert.equal(cancelResult.ok,true,'pending dispatch cancellation should succeed');
 const afterCancel=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
 assert.equal(afterCancel.status.pendingCount,0,'cancelled request must be removed from pending status');
+const raceId='32345678-1234-1234-1234-123456789012';
+const raceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:raceId}},sender);
+assert.equal(raceStage.ok,true,'race-test request should stage');
+holdPrepare=true;
+prepareStarted=new Promise(resolve=>{prepareStartedResolve=resolve;});
+const approveInFlight=invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:raceId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+await prepareStarted;
+const cancelInFlight=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:raceId}},sender);
+assert.equal(cancelInFlight.ok,false,'cancellation must fail closed while approval is in flight');
+assert.match(cancelInFlight.error,/already in progress/,'in-flight cancellation failure must explain the ambiguous state');
+releasePrepare();
+const approvedInFlight=await approveInFlight;
+holdPrepare=false;
+assert.equal(approvedInFlight.ok,true,'the already-started approval should resolve after manual preparation');
+
 console.log('Behavioral extension protocol tests passed.');
 
 console.log('Consilium static checks passed.');
