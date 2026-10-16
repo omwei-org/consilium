@@ -21,7 +21,7 @@ No server-side message store and no model API are part of the MVP.
 Version 1 external messages: `CONSILIUM_PING`, `CONSILIUM_GET_STATUS`, `CONSILIUM_CONFIRM_DISPATCH`, `CONSILIUM_CANCEL_DISPATCH`. The extension validates origin, message type, recipient, content length and SHA-256 content hash. Dispatch IDs are single-use. The content script never clicks Send.
 
 ## Context policy
-Keep original intent, prior instructions and captured messages in local history. Do not silently summarize or drop context. If the prompt is too large, pause for an explicit moderator decision. Response capture and automatic round completion are not yet implemented.
+Keep original intent, prior moderator instructions and manually captured assistant responses in local history. Full dispatch records remain available in history/export but are excluded from future prompt context to avoid recursively repeating the assembled prompt. Do not silently summarize or drop substantive context. If the prompt is too large, pause for an explicit moderator decision. Response capture is manual; automatic capture and reliable generation-completion detection are not implemented.
 
 ## Acceptance checklist
 - [x] Create and export local sessions.
@@ -30,7 +30,7 @@ Keep original intent, prior instructions and captured messages in local history.
 - [x] Do not automatically retry an ambiguous dispatch.
 - [x] Keep Send action manual.
 - [ ] Verify provider selectors against current ChatGPT and Claude UI.
-- [ ] Capture complete responses and detect completion.
+- [x] Allow moderator to paste and save responses locally for later rounds.\n- [ ] Automatically capture complete responses and reliably detect generation completion.
 - [ ] Restore in-progress round state after refresh/service-worker restart.
 - [ ] Move approval to extension-owned trusted UI before production.
 - [ ] Review current provider terms and Chrome Web Store policy before release.
