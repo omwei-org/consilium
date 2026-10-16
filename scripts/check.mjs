@@ -104,6 +104,11 @@ assert.doesNotMatch(content, /MutationObserver|CONSILIUM_CAPTURED_RESPONSE|captu
 assert.match(app, /catch\(err\)\{toast\(err\.message\|\|'Could not build prompt\. Nothing was sent\.'\);return;\}/, 'prompt-size and construction errors must be handled in the UI');
 assert.match(app, /\$\('instruction'\)\.value='';/, 'a recorded moderator instruction must not be silently reused next round');
 assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core must load before the app');
+assert.ok(html.includes('id="manual-chatgpt"') && html.includes('id="manual-claude"'), 'recipient-specific manual fallback controls must exist');
+assert.ok(html.includes('id="manual-fallback"') && html.includes('id="manual-content"'), 'manual fallback dialog must exist');
+assert.ok(app.includes('function openManualFallback(provider)') && app.includes("buildPrompt()"), 'manual fallback must use the context-aware prompt builder');
+assert.ok(app.includes('navigator.clipboard.writeText(content)'), 'manual fallback must offer clipboard copy');
+assert.ok(app.includes('Could not access clipboard. Prompt selected; copy it manually.'), 'manual fallback must work when clipboard access is unavailable');
 
 
 const { webcrypto } = await import('node:crypto');
