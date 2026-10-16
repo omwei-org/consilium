@@ -21,7 +21,7 @@ function closeApproval(result){if(!$('approval').open)return;$('approval').close
 function extensionId(){return localStorage.getItem('consilium.extensionId')||'';}
 function validExtensionId(id){return /^[a-p]{32}$/.test(id);}
 $('approval-form').addEventListener('submit',e=>{e.preventDefault();closeApproval(true);});
-$('cancel-approval').addEventListener('click',()=>{queue=[];closeApproval(false);});
+$('cancel-approval').addEventListener('click',async()=>{queue=[];closeApproval(false);const extId=extensionId();let failed=0;for(const item of stagedDispatches){try{const r=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:item.dispatchId}});if(!r?.ok)failed++;}catch{failed++;}}if(failed)toast('Round cancelled, but '+failed+' staged request(s) could not be confirmed cancelled. Check the extension popup before continuing.');else toast('Round cancelled; pending extension requests were removed.');});
 $('intent-form').addEventListener('submit',async e=>{e.preventDefault();const intent=$('intent').value.trim();if(!intent)return;try{await createSession(intent);$('intent').value='';toast('Session created.');}catch(err){toast('Could not save session: '+err.message);}});
 $('new-round').addEventListener('click',()=>{$('instruction').focus();});
 $('prepare-round').addEventListener('click',async()=>{
