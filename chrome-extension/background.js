@@ -32,6 +32,8 @@ async function stage(payload){
 async function dispatchApproved(dispatchId){
  if(typeof dispatchId!=='string')throw Error('Invalid dispatch ID.');
  if(inFlightDispatches.has(dispatchId))throw Error('Dispatch already in progress; manual review required.');
+ inFlightDispatches.add(dispatchId);
+ try {
  const state=await chrome.storage.local.get([PENDING_KEY]);
  const pending=state[PENDING_KEY]||{},payload=pending[dispatchId];
  if(!payload)throw Error('Pending request no longer exists. Refresh the extension popup.');
@@ -42,14 +44,14 @@ async function dispatchApproved(dispatchId){
  const prior=await chrome.storage.local.get(consumedKey);if(prior[consumedKey])throw Error('Dispatch ID already consumed; manual review required.');
  const tabs=await matchingTabs(),matches=tabs[recipient];if(!matches.length)throw Error('No '+recipient+' tab found.');if(matches.length!==1)throw Error('Multiple '+recipient+' tabs found. Close extra tabs first.');
  const target=matches[0],tab=await chrome.tabs.get(target.tabId);if(providerFromUrl(tab.url||'')!==recipient)throw Error('Target tab changed before approval.');
- inFlightDispatches.add(dispatchId);
  await chrome.storage.local.set({[consumedKey]:{consumedAt:new Date().toISOString(),recipient,contentHash:hash,sessionId,roundId}});
  delete pending[dispatchId];await chrome.storage.local.set({[PENDING_KEY]:pending});
  try{
   const result=await chrome.tabs.sendMessage(target.tabId,{protocolVersion:PROTOCOL_VERSION,type:'CONSILIUM_PROVIDER_PREPARE',payload:{dispatchId,recipient,content,contentHash:hash}});
   if(!result?.ok)throw Error(result?.error||'Provider adapter could not prepare the message.');
   return {status:'prepared_for_manual_send',tabId:target.tabId,provider:recipient,detail:'Text inserted for review; click Send manually in the provider tab.'};
- }catch(error){throw Error('Dispatch outcome may be unknown; do not retry automatically. '+error.message);}finally{inFlightDispatches.delete(dispatchId);}
+ }catch(error){throw Error('Dispatch outcome may be unknown; do not retry automatically. '+error.message);}
+ } finally {inFlightDispatches.delete(dispatchId);}
 }
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
  (async()=>{
