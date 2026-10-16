@@ -173,6 +173,43 @@ const approvedInFlight=await approveInFlight;
 holdPrepare=false;
 assert.equal(approvedInFlight.ok,true,'the already-started approval should resolve after manual preparation');
 
+
+const contentSource=read('chrome-extension/content.js');
+let contentHandler;
+class FakeTextArea {
+  constructor(value=''){this._value=value;this.disabled=false;this.isConnected=true;this.isContentEditable=false;this.focused=false;this.events=[];}
+  get value(){return this._value;}
+  set value(v){this._value=v;}
+  getBoundingClientRect(){return {width:240,height:60};}
+  getAttribute(){return null;}
+  focus(){this.focused=true;}
+  dispatchEvent(e){this.events.push(e);return true;}
+}
+class FakeInputEvent {constructor(type,init){this.type=type;Object.assign(this,init);}}
+let visibleComposers=[];
+const fakeDocument={querySelectorAll(selector){if(selector==='#prompt-textarea')return visibleComposers;return [];}};
+const contentSandbox={chrome:{runtime:{id:chromeMock.runtime.id,onMessage:{addListener:fn=>{contentHandler=fn;}}}},location:{hostname:'chatgpt.com'},document:fakeDocument,HTMLTextAreaElement:FakeTextArea,HTMLInputElement:class FakeInput{},InputEvent:FakeInputEvent,Error,String,Array};
+vm.runInNewContext(contentSource,{...contentSandbox,globalThis:contentSandbox},{filename:'content.behavior-test.js'});
+const contentMessage=(recipient='chatgpt',text='A reviewed prompt')=>new Promise(resolve=>contentHandler({protocolVersion:1,type:'CONSILIUM_PROVIDER_PREPARE',payload:{dispatchId:'content-test-123456789012',recipient,content:text,contentHash:'not-rechecked-here'}},{id:chromeMock.runtime.id},resolve));
+const emptyComposer=new FakeTextArea('');
+visibleComposers=[emptyComposer];
+const prepared=await contentMessage();
+assert.equal(prepared.ok,true,'supported empty composer should accept the reviewed text');
+assert.equal(emptyComposer.value,'A reviewed prompt','adapter must insert the exact approved text');
+assert.equal(emptyComposer.focused,true,'adapter should focus the target composer');
+assert.equal(emptyComposer.events.length,1,'adapter should dispatch an input event for framework state');
+const draftComposer=new FakeTextArea('my unsent draft');
+visibleComposers=[draftComposer];
+const draftResult=await contentMessage();
+assert.equal(draftResult.ok,false,'adapter must refuse a non-empty composer');
+assert.equal(draftComposer.value,'my unsent draft','existing draft must remain unchanged');
+visibleComposers=[new FakeTextArea(''),new FakeTextArea('')];
+const ambiguousComposer=await contentMessage();
+assert.equal(ambiguousComposer.ok,false,'adapter must refuse multiple matching composers');
+visibleComposers=[new FakeTextArea('')];
+const wrongProvider=await contentMessage('claude');
+assert.equal(wrongProvider.ok,false,'adapter must refuse a recipient/provider mismatch');
+
 console.log('Behavioral extension protocol tests passed.');
 
 console.log('Consilium static checks passed.');
