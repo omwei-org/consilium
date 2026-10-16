@@ -57,6 +57,8 @@ assert.match(bg, /do not retry automatically/, 'ambiguous delivery must not be r
 const popup = read('chrome-extension/popup.js');
 assert.match(popup, /CONSILIUM_POPUP_APPROVE/, 'trusted popup must approve staged requests');
 assert.match(popup, /CONSILIUM_POPUP_REJECT/, 'trusted popup must reject staged requests');
+assert.match(popup, /CONSILIUM_POPUP_RESOLVE_UNKNOWN/, 'trusted popup must support explicit manual resolution of unknown outcomes');
+assert.match(bg, /An earlier dispatch has an unknown outcome/, 'new dispatches must fail closed while an earlier outcome is unknown');
 assert.match(popup, /sort\(\(a,b\)=>String\(a\.stagedAt\)/, 'popup must order requests deterministically');
 assert.match(bg, /sender\.url!==expectedUrl/, 'only the extension-owned popup may approve');
 assert.match(bg, /awaiting_extension_approval/, 'webpage requests must stage instead of dispatching');
@@ -247,6 +249,16 @@ const workerRestartSandbox={...extensionSandbox};
 vm.runInNewContext(bg,{...workerRestartSandbox,globalThis:workerRestartSandbox},{filename:'background.restart-test.js'});
 const statusAfterRestart=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
 assert.ok(statusAfterRestart.status.unresolvedAttempts.some(x=>x.dispatchId===unknownId),'outcome-unknown record must survive simulated service-worker restart');
+
+
+const blockedAfterUnknown=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:'92345678-1234-1234-1234-123456789012'}},sender);
+assert.equal(blockedAfterUnknown.ok,false,'new dispatches must be blocked while any outcome remains unknown');
+assert.match(blockedAfterUnknown.error,/unknown outcome/,'block must explain unresolved ambiguity');
+const resolvedUnknown=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_RESOLVE_UNKNOWN',dispatchId:unknownId,confirmation:'inspected_provider_tabs'},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(resolvedUnknown.ok,true,'trusted popup can record explicit manual inspection');
+assert.equal(extensionStorage.consiliumDispatchAttempts[unknownId].state,'manually_reviewed','manual resolution must be durably recorded');
+const allowedAfterReview=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:'a2345678-1234-1234-1234-123456789012'}},sender);
+assert.equal(allowedAfterReview.ok,true,'new staging can resume only after manual review is recorded');
 
 console.log('Behavioral extension protocol tests passed.');
 
