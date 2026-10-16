@@ -107,6 +107,9 @@ assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core mu
 assert.match(html, /id="round-status-text"/, 'visible current-round status must be present');
 assert.match(app, /currentResponses=PROVIDERS\.filter\(p=>active\.messages\.some\(m=>m\.sender===p&&m\.kind==='response'&&Number\(m\.round\)===currentRound\)\)/, 'round summary must count only responses belonging to the current round');
 assert.match(app, /currentResponses\.length\+' of 2 responses recorded'/, 'round summary must clearly show response progress');
+assert.match(app, /Next: open the Consilium extension popup and approve each staged request/, 'round status must tell the moderator when extension approval is next');
+assert.match(app, /Manual round · '\+currentResponses\.length\+' of 2 responses saved/, 'manual rounds must explain that provider responses need to be recorded');
+assert.match(app, /\$\('save-'\+p\)\.disabled=!roundOpen/, 'response capture must be disabled when there is no open round or the round is closed');
 assert.match(app, /const currentRound=Number\(active\.pendingRound\?\.round\?\?active\.round\)/, 'provider status must use the active round, not merely any historical response');
 assert.match(app, /Response saved for round '\+currentRound/, 'provider status must identify a response saved for the current round');
 assert.match(app, /Waiting for response for round '\+currentRound/, 'provider status must show when the current round still lacks a response');
