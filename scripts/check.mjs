@@ -102,7 +102,7 @@ const chromeMock = {
     async sendMessage(id,message){assert.equal(id,11);assert.equal(message.type,'CONSILIUM_PROVIDER_PREPARE');return {ok:true,status:'prepared_for_manual_send'};}
   }
 };
-const extensionSandbox={chrome:chromeMock,crypto:webcrypto,URL,Date,Set,Map,Object,Array,String,Error,RegExp,Promise};
+const extensionSandbox={chrome:chromeMock,crypto:webcrypto,TextEncoder,URL,Date,Set,Map,Object,Array,String,Error,RegExp,Promise};
 vm.runInNewContext(bg,{...extensionSandbox,globalThis:extensionSandbox},{filename:'background.behavior-test.js'});
 const invoke=(handler,message,sender)=>new Promise(resolve=>handler(message,sender,resolve));
 const sender={url:'https://omwei.tech/'};
