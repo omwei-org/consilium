@@ -28,6 +28,7 @@ $('reconcile-round').addEventListener('click',async()=>{if(!active?.pendingRound
 
 $('prepare-round').addEventListener('click',async()=>{
  if(!active){toast('Start or select a session first.');return;}
+ if(active.pendingRound&&active.pendingRound.status!=='complete'){toast('Resolve the current round first. Reconcile its dispatches and record both provider responses; nothing will be resent automatically.');return;}
  if(isDispatching){toast('A dispatch sequence is already running.');return;}
  const extId=extensionId();if(!validExtensionId(extId)){toast('Set a valid extension ID in Settings first.');$('settings-open').focus();return;}
  const moderatorInstruction=$('instruction').value.trim();
