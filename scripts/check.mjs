@@ -56,4 +56,9 @@ assert.match(bg, /do not retry automatically/, 'ambiguous delivery must not be r
 const content = read('chrome-extension/content.js');
 assert.doesNotMatch(content, /\.click\(\)/, 'content script must not auto-click provider Send');
 assert.match(content, /Review and click Send manually/, 'manual-send safety copy missing');
+assert.doesNotMatch(content, /MutationObserver|CONSILIUM_CAPTURED_RESPONSE|capturedAt/, 'automatic response capture must remain disabled until the complete protocol is implemented');
+assert.match(app, /catch\(err\)\{toast\(err\.message\|\|'Could not build prompt\. Nothing was sent\.'\);return;\}/, 'prompt-size and construction errors must be handled in the UI');
+assert.match(app, /\$\('instruction'\)\.value='';/, 'a recorded moderator instruction must not be silently reused next round');
+assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core must load before the app');
+
 console.log('Consilium static checks passed.');
