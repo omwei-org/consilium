@@ -107,6 +107,11 @@ assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core mu
 assert.ok(html.includes('id="manual-chatgpt"') && html.includes('id="manual-claude"'), 'recipient-specific manual fallback controls must exist');
 assert.ok(html.includes('id="manual-fallback"') && html.includes('id="manual-content"'), 'manual fallback dialog must exist');
 assert.ok(app.includes('function openManualFallback(provider)') && app.includes("buildPrompt()"), 'manual fallback must use the context-aware prompt builder');
+assert.match(app, /mode:'manual_fallback',promptContent:content/, 'manual fallback must persist the round and the exact shared prompt');
+assert.match(app, /content=current\.promptContent/, 'the second provider must receive the same prompt after refresh or a first response');
+assert.match(app, /Resolve the active extension round first/, 'manual fallback must not bypass an unresolved extension dispatch');
+assert.match(app, /active\.messages\.push\(\{id:uid\(\),round,sender:'moderator',kind:'moderator_instruction'/, 'manual-round moderator instructions must be recorded for later context');
+assert.match(app, /mode!=='manual_fallback'&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)/, 'manual rounds must not show extension-recovery controls');
 assert.ok(app.includes('navigator.clipboard.writeText(content)'), 'manual fallback must offer clipboard copy');
 assert.ok(app.includes('Could not access clipboard. Prompt selected; copy it manually.'), 'manual fallback must work when clipboard access is unavailable');
 
