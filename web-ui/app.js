@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const PROVIDERS = ['chatgpt', 'claude'];
 const DB_NAME = 'consilium-local';
 const MAX_CONTENT_CHARS = 30000;
-let db, sessions = [], active = null, queue = [], approvalResolve = null, isDispatching = false;
+let db, sessions = [], active = null, queue = [], approvalResolve = null, isDispatching = false, stagedDispatches = [];
 const uid = () => crypto.randomUUID();
 const iso = () => new Date().toISOString();
 function toast(text) { const el=$('toast'); el.textContent=text; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),3500); }
@@ -31,7 +31,7 @@ $('prepare-round').addEventListener('click',async()=>{
  const moderatorInstruction=$('instruction').value.trim();
  let content;try{content=buildPrompt();}catch(err){toast(err.message||'Could not build prompt. Nothing was sent.');return;}if(content.length>MAX_CONTENT_CHARS){toast('Full context exceeds the supported size. Nothing was sent; export or start a separate session.');return;}
  isDispatching=true;$('prepare-round').disabled=true;
- const round=active.round+1;queue=PROVIDERS.map(provider=>({provider,content,round}));
+ const round=active.round+1;stagedDispatches=[];queue=PROVIDERS.map(provider=>({provider,content,round}));
  try{
   active.round=round;
   if(moderatorInstruction)active.messages.push({id:uid(),round,sender:'moderator',kind:'moderator_instruction',content:moderatorInstruction,createdAt:iso(),status:'recorded'});
@@ -45,6 +45,7 @@ $('prepare-round').addEventListener('click',async()=>{
    const contentHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(item.content)))].map(b=>b.toString(16).padStart(2,'0')).join('');
    active.messages.push({id:uid(),round:item.round,sender:'moderator',recipient:item.provider,content:item.content,createdAt:iso(),status:'staged_for_extension_approval'});await saveSession();
    try{
+    stagedDispatches.push({dispatchId,provider:item.provider,round:item.round});
     const result=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{dispatchId,sessionId:active.id,roundId:String(item.round),recipient:item.provider,content:item.content,contentHash,attempt:1}});
     if(!result?.ok)throw new Error(result?.error||'Extension did not confirm dispatch.');
     active.messages.push({id:uid(),round:item.round,sender:'system',recipient:item.provider,content:'Awaiting trusted approval in the Consilium Chrome Extension popup. After approval, review the text in the provider tab and click Send yourself.',createdAt:iso(),status:'awaiting_extension_approval'});
@@ -56,7 +57,7 @@ $('prepare-round').addEventListener('click',async()=>{
    await saveSession();renderActive();
   }
  }catch(err){queue=[];toast('Round stopped safely: '+err.message);}
- finally{queue=[];isDispatching=false;$('prepare-round').disabled=false;}
+ finally{queue=[];stagedDispatches=[];isDispatching=false;$('prepare-round').disabled=false;}
 });
 $('export').addEventListener('click',()=>{if(!active)return;const blob=new Blob([JSON.stringify(active,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='consilium-'+active.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('clear').addEventListener('click',async()=>{if(isDispatching){toast('Finish or cancel the current approval sequence first.');return;}if(!confirm('Delete all local Consilium sessions? This cannot be undone.'))return;try{await store('readwrite',s=>s.clear());sessions=[];active=null;$('workspace').hidden=true;renderSessions();toast('Local history cleared.');}catch(err){toast('Could not clear history: '+err.message);}});
