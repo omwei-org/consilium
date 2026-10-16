@@ -64,6 +64,11 @@ assert.match(app, /status:'awaiting_extension_approval'/, 'hosted UI must not re
 assert.match(app, /stagedDispatches\.push\(\{dispatchId,provider:item\.provider,round:item\.round\}\)/, 'hosted UI must track staged dispatch IDs');
 assert.match(app, /type:'CONSILIUM_CANCEL_DISPATCH',payload:\{dispatchId:item\.dispatchId\}/, 'cancelled rounds must attempt to cancel pending extension requests');
 assert.match(app, /could not be confirmed cancelled/, 'failed remote cancellation must be surfaced to the moderator');
+assert.match(app, /pendingRound=\{round,status:'preparing'/, 'round recovery state must be persisted before dispatch begins');
+assert.match(app, /Reconcile extension state/, 'recovery UI must offer extension reconciliation');
+assert.match(app, /No dispatch will be retried automatically/, 'recovery must explicitly prohibit automatic retry');
+assert.match(app, /Resolve the current round first/, 'new rounds must wait until the previous round is complete');
+assert.match(bg, /pendingDispatches:Object\.values\(pending\)/, 'extension status must expose pending dispatch metadata for reconciliation');
 const content = read('chrome-extension/content.js');
 assert.doesNotMatch(content, /\.click\(\)/, 'content script must not auto-click provider Send');
 assert.match(content, /Review and click Send manually/, 'manual-send safety copy missing');
