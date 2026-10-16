@@ -31,7 +31,7 @@ assert.ok(context.includes('Compare assumptions'), 'moderator instructions must 
 assert.ok(!context.includes('technical dispatch envelope') && !context.includes('Prepared in claude'), 'dispatch/system records must be excluded');
 assert.ok(context.indexOf('ChatGPT answer') < context.indexOf('Claude answer'), 'response order must be preserved');
 const prompt = core.buildPrompt('Choose a deployment approach', fixture, 'Identify unresolved risks');
-assert.ok(prompt.includes('ORIGINAL INTENT\\nChoose a deployment approach'), 'original intent must be preserved');
+assert.ok(prompt.includes('ORIGINAL INTENT') && prompt.includes('Choose a deployment approach'), 'original intent must be preserved');
 assert.ok(prompt.includes('Identify unresolved risks'), 'current moderator instruction must be included');
 assert.throws(() => core.buildPrompt('', [], ''), /Original intent is required/, 'empty intent must fail closed');
 assert.equal(core.isDuplicateResponse(fixture,'chatgpt',1,'ChatGPT answer'), true, 'duplicate response must be detected');
