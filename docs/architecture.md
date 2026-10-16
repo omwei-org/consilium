@@ -34,7 +34,8 @@ Keep original intent, prior moderator instructions and manually captured assista
 - [x] Keep Send action manual.
 - [ ] Verify provider selectors against current ChatGPT and Claude UI.
 - [x] Allow moderator to paste and save responses locally for later rounds.\n- [ ] Automatically capture complete responses and reliably detect generation completion.
-- [ ] Restore in-progress round state after refresh/service-worker restart.
+- [x] Persist round state and reconcile extension-pending dispatches after page refresh without automatic retries.
+- [ ] End-to-end test recovery across refresh and service-worker restart in Chrome.
 - [x] Implement extension-owned approval popup prototype; hosted page can only stage requests.
 - [ ] Security-review popup sender validation and test approval behavior in Chrome.
 - [ ] Review current provider terms and Chrome Web Store policy before release.
