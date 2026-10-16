@@ -137,6 +137,22 @@ const cancelResult=await invoke(externalHandler,{protocolVersion:1,type:'CONSILI
 assert.equal(cancelResult.ok,true,'pending dispatch cancellation should succeed');
 const afterCancel=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
 assert.equal(afterCancel.status.pendingCount,0,'cancelled request must be removed from pending status');
+const orderFirst='62345678-1234-1234-1234-123456789012';
+const orderSecond='72345678-1234-1234-1234-123456789012';
+for(const id of [orderFirst,orderSecond]){
+ const r=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:id}},sender);
+ assert.equal(r.ok,true,'ordered request should stage');
+}
+const storedPending=extensionStorage.consiliumPendingDispatches;
+storedPending[orderFirst].stagedAt='2026-01-01T00:00:00.000Z';
+storedPending[orderSecond].stagedAt='2026-01-01T00:00:01.000Z';
+const approveLater=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:orderSecond},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(approveLater.ok,false,'background must refuse approval out of order');
+assert.match(approveLater.error,/oldest pending request first/,'out-of-order refusal must be explicit');
+const rejectFirst=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_REJECT',dispatchId:orderFirst},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(rejectFirst.ok,true,'oldest request can be explicitly rejected');
+const approveNowOldest=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:orderSecond},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(approveNowOldest.ok,true,'next request can be approved after oldest request is resolved');
 const multiId='42345678-1234-1234-1234-123456789012';
 const multiStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:multiId}},sender);
 assert.equal(multiStage.ok,true,'multiple-tab test request should stage');
