@@ -29,7 +29,7 @@ $('prepare-round').addEventListener('click',async()=>{
  if(isDispatching){toast('A dispatch sequence is already running.');return;}
  const extId=extensionId();if(!validExtensionId(extId)){toast('Set a valid extension ID in Settings first.');$('settings-open').focus();return;}
  const moderatorInstruction=$('instruction').value.trim();
- const content=buildPrompt();if(content.length>MAX_CONTENT_CHARS){toast('Full context exceeds the supported size. Nothing was sent; export or start a separate session.');return;}
+ let content;try{content=buildPrompt();}catch(err){toast(err.message||'Could not build prompt. Nothing was sent.');return;}if(content.length>MAX_CONTENT_CHARS){toast('Full context exceeds the supported size. Nothing was sent; export or start a separate session.');return;}
  isDispatching=true;$('prepare-round').disabled=true;
  const round=active.round+1;queue=PROVIDERS.map(provider=>({provider,content,round}));
  try{
