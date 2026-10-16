@@ -108,10 +108,10 @@ const invoke=(handler,message,sender)=>new Promise(resolve=>handler(message,send
 const sender={url:'https://omwei.tech/'};
 const badOrigin=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_PING'},{url:'https://attacker.example/'});
 assert.equal(badOrigin.ok,false,'untrusted origin must be rejected');
-const content='Behavioral test: prepare, do not send.';
-const hash=[...new Uint8Array(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(content)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const behaviorContent='Behavioral test: prepare, do not send.';
+const hash=[...new Uint8Array(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(behaviorContent)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const dispatchId='12345678-1234-1234-1234-123456789012';
-const payload={dispatchId,sessionId:'session-test',roundId:'1',recipient:'chatgpt',content,contentHash:hash,attempt:1};
+const payload={dispatchId,sessionId:'session-test',roundId:'1',recipient:'chatgpt',content:behaviorContent,contentHash:hash,attempt:1};
 const staged=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload},sender);
 assert.equal(staged.ok,true,'valid request must be staged');
 assert.equal(staged.status,'awaiting_extension_approval','staging must not dispatch automatically');
