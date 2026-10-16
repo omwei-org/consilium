@@ -25,7 +25,7 @@
   else observed={status:'outcome_unknown',reason:'not_found_in_extension'};
   if(terminal.includes(observed.status))return observed;
   // A stale status snapshot must never roll a locally observed later state backwards.
-  if(previous==='prepared_for_manual_send'&&observed.status==='awaiting_extension_approval')return {status:previous,source:'local_state_preserved',preserved:true};
+  if(previous==='prepared_for_manual_send'&&!terminal.includes(observed.status))return {status:previous,source:'local_state_preserved',reason:'confirmed_preparation_is_not_rolled_back_by_nonterminal_snapshot',preserved:true};
   if(previous==='manually_reviewed_outcome_still_unknown'&&observed.status!=='cancelled_before_approval'&&observed.status!=='rejected_before_approval')return {status:previous,source:'local_state_preserved',reason:'manual_review_does_not_prove_delivery',preserved:true};
   if(previous==='outcome_unknown'&&observed.status==='awaiting_extension_approval')return {status:previous,source:'local_state_preserved',reason:'stale_status_cannot_resolve_unknown',preserved:true};
   return observed;
