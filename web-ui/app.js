@@ -36,6 +36,7 @@ $('prepare-round').addEventListener('click',async()=>{
   active.round=round;
   if(moderatorInstruction)active.messages.push({id:uid(),round,sender:'moderator',kind:'moderator_instruction',content:moderatorInstruction,createdAt:iso(),status:'recorded'});
   await saveSession();
+  $('instruction').value='';
   while(queue.length){
    const item=queue.shift();
    const approved=await confirmOne(item.provider,item.content);
