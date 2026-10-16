@@ -9,8 +9,9 @@ assert.equal(manifest.manifest_version, 3, 'extension must use Manifest V3');
 assert.ok(manifest.externally_connectable.matches.includes('https://omwei.tech/*'), 'production origin must be allowed');
 assert.ok(manifest.host_permissions.includes('https://chatgpt.com/*'), 'ChatGPT host permission missing');
 assert.ok(manifest.host_permissions.includes('https://claude.ai/*'), 'Claude host permission missing');
+assert.equal(manifest.action.default_popup, 'popup.html', 'toolbar action must open trusted approval popup');
 
-for (const file of ['web-ui/core.js', 'web-ui/app.js', 'chrome-extension/background.js', 'chrome-extension/content.js']) {
+for (const file of ['web-ui/core.js', 'web-ui/app.js', 'chrome-extension/background.js', 'chrome-extension/content.js', 'chrome-extension/popup.js']) {
   new vm.Script(read(file), { filename: file });
 }
 const coreSource = read('web-ui/core.js');
@@ -53,6 +54,13 @@ const bg = read('chrome-extension/background.js');
 assert.match(bg, /contentHash/, 'dispatch must validate content hash');
 assert.match(bg, /already consumed/, 'dispatch IDs must be single-use');
 assert.match(bg, /do not retry automatically/, 'ambiguous delivery must not be retried');
+const popup = read('chrome-extension/popup.js');
+assert.match(popup, /CONSILIUM_POPUP_APPROVE/, 'trusted popup must approve staged requests');
+assert.match(popup, /CONSILIUM_POPUP_REJECT/, 'trusted popup must reject staged requests');
+assert.match(popup, /sort\(\(a,b\)=>String\(a\.stagedAt\)/, 'popup must order requests deterministically');
+assert.match(bg, /sender\.url!==expectedUrl/, 'only the extension-owned popup may approve');
+assert.match(bg, /awaiting_extension_approval/, 'webpage requests must stage instead of dispatching');
+assert.match(app, /status:'awaiting_extension_approval'/, 'hosted UI must not report staged requests as already prepared');
 const content = read('chrome-extension/content.js');
 assert.doesNotMatch(content, /\.click\(\)/, 'content script must not auto-click provider Send');
 assert.match(content, /Review and click Send manually/, 'manual-send safety copy missing');
