@@ -10,9 +10,33 @@ assert.ok(manifest.externally_connectable.matches.includes('https://omwei.tech/*
 assert.ok(manifest.host_permissions.includes('https://chatgpt.com/*'), 'ChatGPT host permission missing');
 assert.ok(manifest.host_permissions.includes('https://claude.ai/*'), 'Claude host permission missing');
 
-for (const file of ['web-ui/app.js', 'chrome-extension/background.js', 'chrome-extension/content.js']) {
+for (const file of ['web-ui/core.js', 'web-ui/app.js', 'chrome-extension/background.js', 'chrome-extension/content.js']) {
   new vm.Script(read(file), { filename: file });
 }
+const coreSource = read('web-ui/core.js');
+const coreSandbox = {};
+vm.runInNewContext(coreSource, { globalThis: coreSandbox });
+const core = coreSandbox.ConsiliumCore;
+assert.ok(core, 'core module must export the conversation helpers');
+const fixture = [
+  {sender:'moderator', recipient:'chatgpt', content:'[technical dispatch envelope]', status:'approved'},
+  {sender:'chatgpt', kind:'response', round:1, content:'ChatGPT answer'},
+  {sender:'system', recipient:'claude', content:'Prepared in claude', status:'prepared'},
+  {sender:'claude', kind:'response', round:1, content:'Claude answer'},
+  {sender:'moderator', kind:'moderator_instruction', content:'Compare assumptions'}
+];
+const context = core.conversationContext(fixture);
+assert.ok(context.includes('ChatGPT answer') && context.includes('Claude answer'), 'both assistant responses must be included');
+assert.ok(context.includes('Compare assumptions'), 'moderator instructions must be included');
+assert.ok(!context.includes('technical dispatch envelope') && !context.includes('Prepared in claude'), 'dispatch/system records must be excluded');
+assert.ok(context.indexOf('ChatGPT answer') < context.indexOf('Claude answer'), 'response order must be preserved');
+const prompt = core.buildPrompt('Choose a deployment approach', fixture, 'Identify unresolved risks');
+assert.ok(prompt.includes('ORIGINAL INTENT\\nChoose a deployment approach'), 'original intent must be preserved');
+assert.ok(prompt.includes('Identify unresolved risks'), 'current moderator instruction must be included');
+assert.throws(() => core.buildPrompt('', [], ''), /Original intent is required/, 'empty intent must fail closed');
+assert.equal(core.isDuplicateResponse(fixture,'chatgpt',1,'ChatGPT answer'), true, 'duplicate response must be detected');
+assert.equal(core.isDuplicateResponse(fixture,'chatgpt',2,'ChatGPT answer'), false, 'same response text in another round is not a duplicate');
+assert.throws(() => core.buildPrompt('intent', [{sender:'claude',kind:'response',content:'x'.repeat(30000)}], ''), /exceeds the supported size/, 'oversized context must fail closed');
 const app = read('web-ui/app.js');
 const html = read('web-ui/index.html');
 assert.match(app, /while\s*\(queue\.length\)/, 'dispatch approvals must be sequential');
