@@ -87,7 +87,7 @@ assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core mu
 const { webcrypto } = await import('node:crypto');
 const extensionStorage = {};
 let externalHandler, internalHandler;
-let holdPrepare=false, releasePrepare=()=>{}, prepareStartedResolve=()=>{};
+let holdPrepare=false, failPrepare=false, releasePrepare=()=>{}, prepareStartedResolve=()=>{};
 let prepareStarted=new Promise(resolve=>{prepareStartedResolve=resolve;});
 const providerTabs = [{id:11,url:'https://chatgpt.com/',title:'ChatGPT'}];
 const chromeMock = {
@@ -105,7 +105,7 @@ const chromeMock = {
   tabs:{
     async query(){return providerTabs.map(x=>({...x}));},
     async get(id){const t=providerTabs.find(x=>x.id===id);if(!t)throw Error('tab missing');return {...t};},
-    async sendMessage(id,message){assert.equal(id,11);assert.equal(message.type,'CONSILIUM_PROVIDER_PREPARE');if(holdPrepare){prepareStartedResolve();await new Promise(resolve=>{releasePrepare=resolve;});}return {ok:true,status:'prepared_for_manual_send'};}
+    async sendMessage(id,message){assert.equal(id,11);assert.equal(message.type,'CONSILIUM_PROVIDER_PREPARE');if(failPrepare)throw Error('simulated provider adapter failure');if(holdPrepare){prepareStartedResolve();await new Promise(resolve=>{releasePrepare=resolve;});}return {ok:true,status:'prepared_for_manual_send'};}
   }
 };
 const extensionSandbox={chrome:chromeMock,crypto:webcrypto,TextEncoder,URL,Date,Set,Map,Object,Array,String,Error,RegExp,Promise};
@@ -229,6 +229,24 @@ assert.equal(ambiguousComposer.ok,false,'adapter must refuse multiple matching c
 visibleComposers=[new FakeTextArea('')];
 const wrongProvider=await contentMessage('claude');
 assert.equal(wrongProvider.ok,false,'adapter must refuse a recipient/provider mismatch');
+
+
+const unknownId='82345678-1234-1234-1234-123456789012';
+const unknownPayload={...payload,dispatchId:unknownId};
+const unknownStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:unknownPayload},sender);
+assert.equal(unknownStage.ok,true,'unknown-outcome test request should stage');
+failPrepare=true;
+const unknownApprove=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:unknownId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+failPrepare=false;
+assert.equal(unknownApprove.ok,false,'provider adapter failure must not report successful preparation');
+assert.equal(extensionStorage.consiliumDispatchAttempts[unknownId].state,'outcome_unknown','failed adapter delivery must be durably recorded as outcome unknown');
+assert.equal(extensionStorage['consilium.dispatch.'+unknownId]!==undefined,true,'dispatch ID must remain consumed after ambiguous delivery');
+const statusUnknown=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
+assert.ok(statusUnknown.status.unresolvedAttempts.some(x=>x.dispatchId===unknownId),'status must expose unresolved outcome after adapter failure');
+const workerRestartSandbox={...extensionSandbox};
+vm.runInNewContext(bg,{...workerRestartSandbox,globalThis:workerRestartSandbox},{filename:'background.restart-test.js'});
+const statusAfterRestart=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
+assert.ok(statusAfterRestart.status.unresolvedAttempts.some(x=>x.dispatchId===unknownId),'outcome-unknown record must survive simulated service-worker restart');
 
 console.log('Behavioral extension protocol tests passed.');
 
