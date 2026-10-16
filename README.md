@@ -7,7 +7,7 @@ A personal browser-based moderator for a discussion between ChatGPT and Claude. 
 - Browser integration through a Manifest V3 Chrome Extension.
 - Sequential, explicit confirmation for each recipient.
 - Local session and message history in IndexedDB.
-- Full context is retained; oversized prompts are not silently summarized.
+- Original intent, moderator instructions, and captured responses are retained in future prompt context; repeated dispatch envelopes remain in local history/export but are excluded from prompts. Oversized prompts are not silently summarized.
 - Ambiguous delivery is not retried automatically.
 - No local bridge, server-side conversation database, team features, or autonomous rounds.
 
@@ -21,4 +21,4 @@ A personal browser-based moderator for a discussion between ChatGPT and Claude. 
 Serve `web-ui/` over HTTP (do not use `file://`). Load `chrome-extension/` as an unpacked extension at `chrome://extensions`. Enter the installed extension ID in the UI settings. The manifest currently allows the production origins and localhost development origins.
 
 ## Status and safety
-This is a prototype scaffold, not production-ready. The extension can prepare text in a recognized provider composer but deliberately does not click Send. Provider DOM selectors must be verified against the live sites. Response capture and completion detection are not implemented. A confirmation shown only in the hosted page is not a trusted boundary against a compromised page or XSS; production should use an extension-owned approval surface.
+This is a prototype scaffold, not production-ready. The extension can prepare text in a recognized provider composer but deliberately does not click Send. Provider DOM selectors must be verified against the live sites. Responses can be pasted into provider-specific fields and stored locally. Automatic response capture and generation-completion detection are not implemented. A confirmation shown only in the hosted page is not a trusted boundary against a compromised page or XSS; production should use an extension-owned approval surface.
