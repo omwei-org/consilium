@@ -47,8 +47,8 @@ $('prepare-round').addEventListener('click',async()=>{
    try{
     const result=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{dispatchId,sessionId:active.id,roundId:String(item.round),recipient:item.provider,content:item.content,contentHash,attempt:1}});
     if(!result?.ok)throw new Error(result?.error||'Extension did not confirm dispatch.');
-    active.messages.push({id:uid(),round:item.round,sender:'system',recipient:item.provider,content:'Prepared in '+item.provider+' for manual review. Switch to the provider tab and click Send yourself.',createdAt:iso(),status:'prepared'});
-    toast(item.provider+' prepared; review it in the provider tab.');
+    active.messages.push({id:uid(),round:item.round,sender:'system',recipient:item.provider,content:'Awaiting trusted approval in the Consilium Chrome Extension popup. After approval, review the text in the provider tab and click Send yourself.',createdAt:iso(),status:'awaiting_extension_approval'});
+    toast(item.provider+' request staged. Open the Consilium toolbar popup to approve it.');
    }catch(err){
     active.messages.push({id:uid(),round:item.round,sender:'system',recipient:item.provider,content:'Dispatch failed or outcome is unknown: '+err.message+' Do not retry automatically.',createdAt:iso(),status:'unknown'});
     toast('Dispatch failed or outcome unknown. Check the provider tab before retrying.');queue=[];
