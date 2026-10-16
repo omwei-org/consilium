@@ -66,6 +66,24 @@ $('prepare-round').addEventListener('click',async()=>{
  }catch(err){queue=[];toast('Round stopped safely: '+err.message);}
  finally{queue=[];if(active?.pendingRound){if(active.pendingRound.status==='preparing')active.pendingRound.status='interrupted';else if(active.pendingRound.status!=='interrupted')active.pendingRound.status='awaiting_manual_responses';active.pendingRound.updatedAt=iso();await saveSession().catch(()=>{});renderActive();}stagedDispatches=[];isDispatching=false;$('prepare-round').disabled=false;}
 });
+
+let manualFallbackProvider=null;
+function openManualFallback(provider){
+ if(!active){toast('Start or select a session first.');return;}
+ let content;try{content=buildPrompt();}catch(err){toast(err.message||'Could not build prompt.');return;}
+ manualFallbackProvider=provider;
+ $('manual-recipient').textContent=provider==='chatgpt'?'ChatGPT':'Claude';
+ $('manual-content').value=content;
+ $('manual-fallback').showModal();
+}
+$('manual-chatgpt').addEventListener('click',()=>openManualFallback('chatgpt'));
+$('manual-claude').addEventListener('click',()=>openManualFallback('claude'));
+$('manual-select').addEventListener('click',()=>{$('manual-content').focus();$('manual-content').select();toast('Prompt selected. Copy it and paste it into '+(manualFallbackProvider==='chatgpt'?'ChatGPT':'Claude')+'.');});
+$('manual-copy').addEventListener('click',async()=>{
+ const content=$('manual-content').value;if(!content){toast('No prompt to copy.');return;}
+ try{if(!navigator.clipboard||!navigator.clipboard.writeText)throw Error('Clipboard API unavailable');await navigator.clipboard.writeText(content);toast('Prompt copied for '+(manualFallbackProvider==='chatgpt'?'ChatGPT':'Claude')+'. Paste and send it manually.');}
+ catch(error){$('manual-content').focus();$('manual-content').select();toast('Could not access clipboard. Prompt selected; copy it manually.');}
+});
 $('export').addEventListener('click',()=>{if(!active)return;const blob=new Blob([JSON.stringify(active,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='consilium-'+active.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('clear').addEventListener('click',async()=>{if(isDispatching){toast('Finish or cancel the current approval sequence first.');return;}if(!confirm('Delete all local Consilium sessions? This cannot be undone.'))return;try{await store('readwrite',s=>s.clear());sessions=[];active=null;$('workspace').hidden=true;renderSessions();toast('Local history cleared.');}catch(err){toast('Could not clear history: '+err.message);}});
 $('settings-open').addEventListener('click',()=>{$('extension-id').value=extensionId();$('settings').showModal();});
