@@ -43,7 +43,7 @@ $('prepare-round').addEventListener('click',async()=>{
    if(!approved){queue=[];toast('Remaining dispatches cancelled.');break;}
    const dispatchId=uid();
    const contentHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(item.content)))].map(b=>b.toString(16).padStart(2,'0')).join('');
-   active.messages.push({id:uid(),round:item.round,sender:'moderator',recipient:item.provider,content:item.content,createdAt:iso(),status:'approved'});await saveSession();
+   active.messages.push({id:uid(),round:item.round,sender:'moderator',recipient:item.provider,content:item.content,createdAt:iso(),status:'staged_for_extension_approval'});await saveSession();
    try{
     const result=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{dispatchId,sessionId:active.id,roundId:String(item.round),recipient:item.provider,content:item.content,contentHash,attempt:1}});
     if(!result?.ok)throw new Error(result?.error||'Extension did not confirm dispatch.');
