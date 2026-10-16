@@ -35,7 +35,10 @@ async function dispatchApproved(dispatchId){
  inFlightDispatches.add(dispatchId);
  try {
  const state=await chrome.storage.local.get([PENDING_KEY]);
- const pending=state[PENDING_KEY]||{},payload=pending[dispatchId];
+ const pending=state[PENDING_KEY]||{};
+ const ordered=Object.values(pending).sort((a,b)=>String(a.stagedAt).localeCompare(String(b.stagedAt)));
+ if(ordered.length&&ordered[0].dispatchId!==dispatchId)throw Error('Resolve the oldest pending request first.');
+ const payload=pending[dispatchId];
  if(!payload)throw Error('Pending request no longer exists. Refresh the extension popup.');
  const {sessionId,roundId,recipient,content,contentHash,attempt}=payload;
  if(!['chatgpt','claude'].includes(recipient)||typeof content!=='string'||!content.trim()||content.length>MAX_CONTENT_CHARS||attempt!==1)throw Error('Pending request failed validation.');
