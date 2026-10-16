@@ -29,14 +29,14 @@ Keep original intent, prior moderator instructions and manually captured assista
 ## Acceptance checklist
 - [x] Create and export local sessions.
 - [x] Separate sequential approval per recipient.
-- [x] Reject missing or multiple provider tabs.
+- [x] Reject missing or multiple provider tabs (behavioral mock tests).
 - [x] Do not automatically retry an ambiguous dispatch.
 - [x] Keep Send action manual.
-- [ ] Verify provider selectors against current ChatGPT and Claude UI.
+- [ ] Verify provider selectors against current ChatGPT and Claude UI in a real Chrome session.
 - [x] Allow moderator to paste and save responses locally for later rounds.\n- [ ] Automatically capture complete responses and reliably detect generation completion.
 - [x] Persist round state and reconcile extension-pending dispatches after page refresh without automatic retries.
 - [x] Allow explicit moderator abandonment of an interrupted round after manual provider-tab review; record the decision locally.
-- [ ] End-to-end test recovery across refresh and service-worker restart in Chrome.
+- [ ] End-to-end test recovery across refresh and service-worker restart in Chrome; simulated protocol tests do not establish browser compatibility.
 - [x] Implement extension-owned approval popup prototype; hosted page can only stage requests.
 - [ ] Security-review popup sender validation and test approval behavior in Chrome.
 - [ ] Review current provider terms and Chrome Web Store policy before release.
