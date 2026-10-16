@@ -60,7 +60,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.protocolVersion!==PROTOCOL_VERSION)throw Error('Invalid internal protocol version.');
   if(message.type==='CONSILIUM_POPUP_LIST_PENDING'){const s=await chrome.storage.local.get(PENDING_KEY);return {ok:true,pending:Object.values(s[PENDING_KEY]||{}).map(p=>({dispatchId:p.dispatchId,recipient:p.recipient,sessionId:p.sessionId,roundId:p.roundId,content:p.content,stagedAt:p.stagedAt}))};}
   if(message.type==='CONSILIUM_POPUP_APPROVE'){return {ok:true,...await dispatchApproved(message.dispatchId)};}
-  if(message.type==='CONSILIUM_POPUP_REJECT'){const s=await chrome.storage.local.get(PENDING_KEY),pending=s[PENDING_KEY]||{};if(!pending[message.dispatchId])throw Error('Pending request no longer exists.');delete pending[message.dispatchId];await chrome.storage.local.set({[PENDING_KEY]:pending});return {ok:true,status:'rejected'};}
+  if(message.type==='CONSILIUM_POPUP_REJECT'){if(inFlightDispatches.has(message.dispatchId))throw Error('This request is already being approved; inspect the provider tab before taking another action.');const s=await chrome.storage.local.get(PENDING_KEY),pending=s[PENDING_KEY]||{};if(!pending[message.dispatchId])throw Error('Pending request no longer exists.');delete pending[message.dispatchId];await chrome.storage.local.set({[PENDING_KEY]:pending});return {ok:true,status:'rejected'};}
   throw Error('Unsupported internal action.');
  })().then(sendResponse).catch(e=>sendResponse(responseError(e.message||'Unknown extension error.')));
  return true;
@@ -73,7 +73,7 @@ chrome.runtime.onMessageExternal.addListener((message,sender,sendResponse)=>{
    case 'CONSILIUM_PING':return {ok:true,protocolVersion:1,status:'ready'};
    case 'CONSILIUM_GET_STATUS':return {ok:true,protocolVersion:1,status:await status()};
    case 'CONSILIUM_CONFIRM_DISPATCH':return {ok:true,protocolVersion:1,...await stage(message.payload)};
-   case 'CONSILIUM_CANCEL_DISPATCH':{const s=await chrome.storage.local.get(PENDING_KEY),pending=s[PENDING_KEY]||{},id=message.payload?.dispatchId;if(typeof id!=='string'||!pending[id])throw Error('Pending request not found or already resolved.');delete pending[id];await chrome.storage.local.set({[PENDING_KEY]:pending});return {ok:true,protocolVersion:1,status:'cancelled',dispatchId:id};}
+   case 'CONSILIUM_CANCEL_DISPATCH':{const id=message.payload?.dispatchId;if(typeof id!=='string')throw Error('Invalid dispatch ID.');if(inFlightDispatches.has(id))throw Error('Request approval is already in progress; cancellation cannot be guaranteed. Inspect the provider tab manually.');const s=await chrome.storage.local.get(PENDING_KEY),pending=s[PENDING_KEY]||{};if(!pending[id])throw Error('Pending request not found or already resolved.');delete pending[id];await chrome.storage.local.set({[PENDING_KEY]:pending});return {ok:true,protocolVersion:1,status:'cancelled',dispatchId:id};}
    default:throw Error('Unsupported message type.');
   }
  })().then(sendResponse).catch(e=>sendResponse(responseError(e.message||'Unknown extension error.')));
