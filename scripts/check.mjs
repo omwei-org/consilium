@@ -65,7 +65,7 @@ assert.match(app, /stagedDispatches\.push\(\{dispatchId,provider:item\.provider,
 assert.match(app, /type:'CONSILIUM_CANCEL_DISPATCH',payload:\{dispatchId:item\.dispatchId\}/, 'cancelled rounds must attempt to cancel pending extension requests');
 assert.match(app, /could not be confirmed cancelled/, 'failed remote cancellation must be surfaced to the moderator');
 assert.match(app, /pendingRound=\{round,status:'preparing'/, 'round recovery state must be persisted before dispatch begins');
-assert.match(app, /Reconcile extension state/, 'recovery UI must offer extension reconciliation');
+assert.match(html, /Reconcile extension state/, 'recovery UI must offer extension reconciliation');
 assert.match(app, /No dispatch will be retried automatically/, 'recovery must explicitly prohibit automatic retry');
 assert.match(app, /Resolve the current round first/, 'new rounds must wait until the previous round is complete');
 assert.match(bg, /pendingDispatches:Object\.values\(pending\)/, 'extension status must expose pending dispatch metadata for reconciliation');
