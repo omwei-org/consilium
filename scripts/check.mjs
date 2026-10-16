@@ -79,4 +79,58 @@ assert.match(app, /catch\(err\)\{toast\(err\.message\|\|'Could not build prompt\
 assert.match(app, /\$\('instruction'\)\.value='';/, 'a recorded moderator instruction must not be silently reused next round');
 assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core must load before the app');
 
+
+const { webcrypto } = await import('node:crypto');
+const extensionStorage = {};
+let externalHandler, internalHandler;
+const providerTabs = [{id:11,url:'https://chatgpt.com/',title:'ChatGPT'}];
+const chromeMock = {
+  runtime: {
+    id:'abcdefghijklmnopabcdefghijklmnop',
+    getManifest:()=>({version:'0.1.0'}),
+    onMessageExternal:{addListener:fn=>{externalHandler=fn;}},
+    onMessage:{addListener:fn=>{internalHandler=fn;}},
+    onInstalled:{addListener:()=>{}}
+  },
+  storage:{local:{
+    async get(keys){if(Array.isArray(keys)){const out={};for(const k of keys)if(k in extensionStorage)out[k]=extensionStorage[k];return out;}if(typeof keys==='string')return keys in extensionStorage?{[keys]:extensionStorage[keys]}:{};return {...extensionStorage};},
+    async set(values){Object.assign(extensionStorage,values);}
+  }},
+  tabs:{
+    async query(){return providerTabs.map(x=>({...x}));},
+    async get(id){const t=providerTabs.find(x=>x.id===id);if(!t)throw Error('tab missing');return {...t};},
+    async sendMessage(id,message){assert.equal(id,11);assert.equal(message.type,'CONSILIUM_PROVIDER_PREPARE');return {ok:true,status:'prepared_for_manual_send'};}
+  }
+};
+const extensionSandbox={chrome:chromeMock,crypto:webcrypto,URL,Date,Set,Map,Object,Array,String,Error,RegExp,Promise};
+vm.runInNewContext(bg,{...extensionSandbox,globalThis:extensionSandbox},{filename:'background.behavior-test.js'});
+const invoke=(handler,message,sender)=>new Promise(resolve=>handler(message,sender,resolve));
+const sender={url:'https://omwei.tech/'};
+const badOrigin=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_PING'},{url:'https://attacker.example/'});
+assert.equal(badOrigin.ok,false,'untrusted origin must be rejected');
+const content='Behavioral test: prepare, do not send.';
+const hash=[...new Uint8Array(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(content)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const dispatchId='12345678-1234-1234-1234-123456789012';
+const payload={dispatchId,sessionId:'session-test',roundId:'1',recipient:'chatgpt',content,contentHash:hash,attempt:1};
+const staged=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload},sender);
+assert.equal(staged.ok,true,'valid request must be staged');
+assert.equal(staged.status,'awaiting_extension_approval','staging must not dispatch automatically');
+const pending=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_LIST_PENDING'},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(pending.pending.length,1,'popup must see staged request');
+const forged=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/other.html'});
+assert.equal(forged.ok,false,'non-popup extension page must not approve');
+const approved=await invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+assert.equal(approved.ok,true,'trusted popup should approve a valid pending request');
+assert.equal(approved.status,'prepared_for_manual_send','approval should prepare text for manual send');
+const duplicate=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload},sender);
+assert.equal(duplicate.ok,false,'consumed dispatch ID must not be staged again');
+const secondId='22345678-1234-1234-1234-123456789012';
+const cancelled=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:secondId}},sender);
+assert.equal(cancelled.ok,true,'second valid dispatch should stage');
+const cancelResult=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:secondId}},sender);
+assert.equal(cancelResult.ok,true,'pending dispatch cancellation should succeed');
+const afterCancel=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
+assert.equal(afterCancel.status.pendingCount,0,'cancelled request must be removed from pending status');
+console.log('Behavioral extension protocol tests passed.');
+
 console.log('Consilium static checks passed.');
