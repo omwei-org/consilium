@@ -8,9 +8,11 @@ async function load(){
  try{
   const r=await call('CONSILIUM_POPUP_LIST_PENDING');
   if(!r?.ok)throw Error(r?.error||'Could not read pending requests.');
+  const uncertain=(r.unresolvedAttempts||[]);
+  for(const a of uncertain){const card=el('article','request unresolved'),title=el('h2','','Outcome unknown — '+(a.recipient==='chatgpt'?'ChatGPT':'Claude')),meta=el('p','meta','Session '+String(a.sessionId||'').slice(0,12)+' · Round '+String(a.roundId||'')),warning=el('p','warning','This request was consumed before preparation completed. Inspect the provider tab manually. Do not retry it automatically.');card.append(title,meta,warning);host.append(card);}
   const pending=(r.pending||[]).sort((a,b)=>String(a.stagedAt).localeCompare(String(b.stagedAt)));
   const firstId=pending[0]?.dispatchId;
-  $('status').textContent=pending.length?pending.length+' request(s) awaiting your decision. Resolve the oldest request first.':'No pending requests.';
+  $('status').textContent=uncertain.length?uncertain.length+' request(s) have an unknown outcome. Inspect provider tabs before doing anything else.':pending.length?pending.length+' request(s) awaiting your decision. Resolve the oldest request first.':'No pending requests.';
   for(const p of pending){
    const card=el('article','request'),title=el('h2','',p.recipient==='chatgpt'?'ChatGPT':'Claude');
    const meta=el('p','meta','Session '+String(p.sessionId).slice(0,12)+' · Round '+p.roundId);
