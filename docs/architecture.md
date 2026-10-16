@@ -38,6 +38,10 @@ A request explicitly cancelled by the hosted UI or rejected in the extension pop
 
 The hosted UI's IndexedDB round ledger and the extension's `chrome.storage.local` ledger are independent stores. `CONSILIUM_GET_STATUS` therefore exposes minimal dispatch-attempt metadata (dispatch ID, state, session/round IDs, recipient, tab ID and update time) alongside pending requests. The hosted UI reconciles each known dispatch deterministically: extension-pending means `awaiting_extension_approval`; `prepared_for_manual_send` means only that text preparation was acknowledged; `preparing` or `outcome_unknown` remains unknown; a manually reviewed attempt is still not evidence of delivery; and a missing extension record is treated as unknown. Reconciliation never retries or marks a request sent. The hosted round remains active until both responses are manually captured or a moderator explicitly abandons it after provider-tab inspection.
 
+## Monotonic reconciliation
+
+Reconciliation must not let a stale extension status snapshot overwrite a more advanced local dispatch state. Known terminal extension outcomes (`cancelled_before_approval`, `rejected_before_approval`) take precedence over stale nonterminal local states. Conversely, a locally observed terminal outcome is preserved if the extension snapshot is older or no longer contains the record. A locally observed `prepared_for_manual_send` cannot be rolled back to `awaiting_extension_approval`; an `outcome_unknown` or manually reviewed-but-still-unknown state cannot be resolved by a pending-only snapshot. This monotonicity protects UI state from stale reads but is not proof of provider delivery.
+
 ## Live-browser validation
 
 Follow [the manual Chrome integration checklist](manual-chrome-test.md). It is an unexecuted test plan, not evidence of a live-browser pass.
