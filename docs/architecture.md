@@ -26,6 +26,10 @@ Version 1 external messages: `CONSILIUM_PING`, `CONSILIUM_GET_STATUS`, `CONSILIU
 ## Context policy
 Keep original intent, prior moderator instructions and manually captured assistant responses in local history. The context-composition helpers have behavioral regression tests for ordering, filtering, duplicate detection, empty intent and oversized context. Full dispatch records remain available in history/export but are excluded from future prompt context to avoid recursively repeating the assembled prompt. Do not silently summarize or drop substantive context. If the prompt is too large, pause for an explicit moderator decision. Response capture is manual; automatic capture and reliable generation-completion detection are not implemented.
 
+## Dispatch recovery ledger
+
+The extension persists a bounded ledger of dispatch attempts in `chrome.storage.local`, without duplicating message bodies. A consumed request is recorded as `preparing` before the provider adapter is called, then `prepared_for_manual_send` on a confirmed adapter response or `outcome_unknown` on an ambiguous failure. A worker restart that leaves an attempt in `preparing` is surfaced as unresolved. While any attempt is `preparing` or `outcome_unknown`, the background handler blocks new staging and approvals. The trusted popup can clear this block only after the operator explicitly confirms manual inspection of the relevant provider tab(s); this records `manually_reviewed`, not proof that a message was or was not sent. Dispatch IDs remain consumed and are never retried automatically.
+
 ## Live-browser validation
 
 Follow [the manual Chrome integration checklist](manual-chrome-test.md). It is an unexecuted test plan, not evidence of a live-browser pass.
@@ -47,6 +51,7 @@ The content adapter has mock-DOM behavioral tests for exact text insertion, pres
 - [ ] Verify provider selectors against current ChatGPT and Claude UI in a real Chrome session.
 - [x] Allow moderator to paste and save responses locally for later rounds.\n- [ ] Automatically capture complete responses and reliably detect generation completion.
 - [x] Persist round state and reconcile extension-pending dispatches after page refresh without automatic retries.
+- [x] Persist extension dispatch attempt outcomes and block new staging while an attempt is unresolved (mocked worker-restart tests).
 - [x] Allow explicit moderator abandonment of an interrupted round after manual provider-tab review; record the decision locally.
 - [ ] End-to-end test recovery across refresh and service-worker restart in Chrome; simulated protocol tests do not establish browser compatibility.
 - [x] Implement extension-owned approval popup prototype; hosted page can only stage requests.
