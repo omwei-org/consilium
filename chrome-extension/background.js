@@ -71,7 +71,7 @@ chrome.runtime.onMessageExternal.addListener((message,sender,sendResponse)=>{
    case 'CONSILIUM_PING':return {ok:true,protocolVersion:1,status:'ready'};
    case 'CONSILIUM_GET_STATUS':return {ok:true,protocolVersion:1,status:await status()};
    case 'CONSILIUM_CONFIRM_DISPATCH':return {ok:true,protocolVersion:1,...await stage(message.payload)};
-   case 'CONSILIUM_CANCEL_DISPATCH':return {ok:true,protocolVersion:1,status:'cancelled'};
+   case 'CONSILIUM_CANCEL_DISPATCH':{const s=await chrome.storage.local.get(PENDING_KEY),pending=s[PENDING_KEY]||{},id=message.payload?.dispatchId;if(typeof id!=='string'||!pending[id])throw Error('Pending request not found or already resolved.');delete pending[id];await chrome.storage.local.set({[PENDING_KEY]:pending});return {ok:true,protocolVersion:1,status:'cancelled',dispatchId:id};}
    default:throw Error('Unsupported message type.');
   }
  })().then(sendResponse).catch(e=>sendResponse(responseError(e.message||'Unknown extension error.')));
