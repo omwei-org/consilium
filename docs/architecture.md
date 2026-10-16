@@ -26,6 +26,10 @@ Version 1 external messages: `CONSILIUM_PING`, `CONSILIUM_GET_STATUS`, `CONSILIU
 ## Context policy
 Keep original intent, prior moderator instructions and manually captured assistant responses in local history. The context-composition helpers have behavioral regression tests for ordering, filtering, duplicate detection, empty intent and oversized context. Full dispatch records remain available in history/export but are excluded from future prompt context to avoid recursively repeating the assembled prompt. Do not silently summarize or drop substantive context. If the prompt is too large, pause for an explicit moderator decision. Response capture is manual; automatic capture and reliable generation-completion detection are not implemented.
 
+## Test coverage boundary
+
+The content adapter has mock-DOM behavioral tests for exact text insertion, preservation of an existing draft, ambiguous composers and recipient mismatch; these do not validate current provider DOM selectors.
+
 ## Acceptance checklist
 - [x] Create and export local sessions.
 - [x] Separate sequential approval per recipient.
