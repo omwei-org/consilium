@@ -61,6 +61,9 @@ assert.match(popup, /sort\(\(a,b\)=>String\(a\.stagedAt\)/, 'popup must order re
 assert.match(bg, /sender\.url!==expectedUrl/, 'only the extension-owned popup may approve');
 assert.match(bg, /awaiting_extension_approval/, 'webpage requests must stage instead of dispatching');
 assert.match(app, /status:'awaiting_extension_approval'/, 'hosted UI must not report staged requests as already prepared');
+assert.match(app, /stagedDispatches\.push\(\{dispatchId,provider:item\.provider,round:item\.round\}\)/, 'hosted UI must track staged dispatch IDs');
+assert.match(app, /type:'CONSILIUM_CANCEL_DISPATCH',payload:\{dispatchId:item\.dispatchId\}/, 'cancelled rounds must attempt to cancel pending extension requests');
+assert.match(app, /could not be confirmed cancelled/, 'failed remote cancellation must be surfaced to the moderator');
 const content = read('chrome-extension/content.js');
 assert.doesNotMatch(content, /\.click\(\)/, 'content script must not auto-click provider Send');
 assert.match(content, /Review and click Send manually/, 'manual-send safety copy missing');
