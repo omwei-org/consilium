@@ -37,6 +37,14 @@ assert.ok(prompt.includes('Identify unresolved risks'), 'current moderator instr
 assert.throws(() => core.buildPrompt('', [], ''), /Original intent is required/, 'empty intent must fail closed');
 assert.equal(core.isDuplicateResponse(fixture,'chatgpt',1,'ChatGPT answer'), true, 'duplicate response must be detected');
 assert.equal(core.isDuplicateResponse(fixture,'chatgpt',2,'ChatGPT answer'), false, 'same response text in another round is not a duplicate');
+
+assert.deepEqual(JSON.parse(JSON.stringify(core.reconcileDispatch({dispatchId:'dispatch-123456789012'}, {pendingDispatches:[{dispatchId:'dispatch-123456789012'}]}))), {status:'awaiting_extension_approval',source:'extension_pending'}, 'pending extension record must reconcile as awaiting approval');
+assert.deepEqual(JSON.parse(JSON.stringify(core.reconcileDispatch({dispatchId:'dispatch-123456789012'}, {pendingDispatches:[],dispatchAttempts:[{dispatchId:'dispatch-123456789012',state:'prepared_for_manual_send',tabId:11}]}))), {status:'prepared_for_manual_send',source:'extension_attempt',tabId:11}, 'confirmed preparation must not be confused with sending');
+assert.deepEqual(JSON.parse(JSON.stringify(core.reconcileDispatch({dispatchId:'dispatch-123456789012'}, {pendingDispatches:[],dispatchAttempts:[{dispatchId:'dispatch-123456789012',state:'outcome_unknown'}]}))), {status:'outcome_unknown',source:'extension_attempt',reason:'outcome_unknown'}, 'ambiguous extension attempt must remain unknown');
+assert.deepEqual(JSON.parse(JSON.stringify(core.reconcileDispatch({dispatchId:'dispatch-123456789012'}, {pendingDispatches:[],dispatchAttempts:[{dispatchId:'dispatch-123456789012',state:'manually_reviewed'}]}))), {status:'manually_reviewed_outcome_still_unknown',source:'extension_attempt',reason:'manual_review_does_not_prove_delivery'}, 'manual inspection must not be interpreted as delivery');
+assert.deepEqual(JSON.parse(JSON.stringify(core.reconcileDispatch({dispatchId:'dispatch-123456789012'}, {pendingDispatches:[],dispatchAttempts:[]}))), {status:'outcome_unknown',reason:'not_found_in_extension'}, 'missing extension metadata must remain unknown');
+assert.deepEqual(JSON.parse(JSON.stringify(core.reconcileDispatch({}, {}))), {status:'outcome_unknown',reason:'missing_dispatch_id'}, 'missing dispatch IDs must fail closed');
+
 assert.throws(() => core.buildPrompt('intent', [{sender:'claude',kind:'response',content:'x'.repeat(30000)}], ''), /exceeds the supported size/, 'oversized context must fail closed');
 const app = read('web-ui/app.js');
 const html = read('web-ui/index.html');
@@ -74,6 +82,9 @@ assert.match(html, /Close round after manual review/, 'interrupted round must ha
 assert.match(app, /Moderator manually abandoned this round after inspecting provider state/, 'manual closure must be recorded in the local audit trail');
 assert.match(app, /if\(active\.pendingRound&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)\)/, 'only completed or manually abandoned rounds may be followed by a new round');
 assert.match(bg, /pendingDispatches:Object\.values\(pending\)/, 'extension status must expose pending dispatch metadata for reconciliation');
+assert.match(bg, /dispatchAttempts:Object\.values\(attempts\)/, 'extension status must expose minimal attempt metadata for reconciliation');
+assert.match(app, /ConsiliumCore\.reconcileDispatch\(d,r\.status\|\|\{\}\)/, 'hosted UI must use deterministic extension-state reconciliation');
+assert.match(coreSource, /manual_review_does_not_prove_delivery/, 'manual review must not be interpreted as proof of delivery');
 const content = read('chrome-extension/content.js');
 assert.doesNotMatch(content, /\.click\(\)/, 'content script must not auto-click provider Send');
 assert.match(content, /Review and click Send manually/, 'manual-send safety copy missing');
