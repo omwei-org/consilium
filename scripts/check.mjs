@@ -104,6 +104,10 @@ assert.doesNotMatch(content, /MutationObserver|CONSILIUM_CAPTURED_RESPONSE|captu
 assert.match(app, /catch\(err\)\{toast\(err\.message\|\|'Could not build prompt\. Nothing was sent\.'\);return;\}/, 'prompt-size and construction errors must be handled in the UI');
 assert.match(app, /\$\('instruction'\)\.value='';/, 'a recorded moderator instruction must not be silently reused next round');
 assert.ok(html.indexOf('src="core.js"') < html.indexOf('src="app.js"'), 'core must load before the app');
+assert.match(app, /const currentRound=Number\(active\.pendingRound\?\.round\?\?active\.round\)/, 'provider status must use the active round, not merely any historical response');
+assert.match(app, /Response saved for round '\+currentRound/, 'provider status must identify a response saved for the current round');
+assert.match(app, /Waiting for response for round '\+currentRound/, 'provider status must show when the current round still lacks a response');
+assert.match(app, /Latest response is from round '\+\(last\.round\?\?'unknown'\)/, 'provider status must distinguish an older response from a current-round response');
 assert.ok(html.includes('id="manual-chatgpt"') && html.includes('id="manual-claude"'), 'recipient-specific manual fallback controls must exist');
 assert.ok(html.includes('id="manual-fallback"') && html.includes('id="manual-content"'), 'manual fallback dialog must exist');
 assert.ok(app.includes('function openManualFallback(provider)') && app.includes("buildPrompt()"), 'manual fallback must use the context-aware prompt builder');
