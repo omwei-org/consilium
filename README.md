@@ -3,7 +3,7 @@
 A personal browser-based moderator for a discussion between ChatGPT and Claude. The MVP uses a hosted UI and a local Chrome Extension; conversation content is not sent to a Consilium server and no model API is used.
 
 ## MVP scope
-- Hosted moderator UI intended for `https://omwei.tech`.
+- Hosted moderator UI intended for `https://www.omwei.tech`.
 - Browser integration through a Manifest V3 Chrome Extension.
 - Sequential, explicit confirmation for each recipient.
 - Local session and message history in IndexedDB.
@@ -19,6 +19,10 @@ A personal browser-based moderator for a discussion between ChatGPT and Claude. 
 
 ## Run locally
 Serve `web-ui/` over HTTP (do not use `file://`). Load `chrome-extension/` as an unpacked extension at `chrome://extensions`. Enter the installed extension ID in the UI settings. The manifest currently allows the production origins and localhost development origins.
+
+## Hosting and deployment
+
+The intended public hostname is `https://www.omwei.tech`. `web-ui/CNAME` declares the custom domain for the published site. `.github/workflows/deploy-pages.yml` builds and deploys the contents of `web-ui/` to GitHub Pages on pushes to `main`; it does not deploy feature branches. Repository Settings → Pages must use GitHub Actions, and the custom domain must be configured and DNS/TLS verified before release. The workflow and CNAME file do not by themselves prove the live site is deployed.
 
 ## Release readiness
 
