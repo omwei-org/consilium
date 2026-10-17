@@ -19,6 +19,17 @@ const coreSandbox = {};
 vm.runInNewContext(coreSource, { globalThis: coreSandbox });
 const core = coreSandbox.ConsiliumCore;
 assert.ok(core, 'core module must export the conversation helpers');
+assert.equal(typeof core.buildPeerPrompt, 'function', 'role-specific peer prompt builder must be exported');
+const firstPrompt = core.buildPeerPrompt('Test intent', [], 'chatgpt');
+assert.match(firstPrompt, /primary author/i, 'first ChatGPT turn must be the primary answer');
+const reviewPrompt = core.buildPeerPrompt('Test intent', [{sender:'chatgpt',kind:'response',round:1,content:'Primary answer'}], 'claude');
+assert.match(reviewPrompt, /peer reviewer/i, 'Claude must receive a peer-review role, not a parallel answer');
+assert.ok(reviewPrompt.includes('Primary answer'), 'Claude peer review must include the actual ChatGPT answer');
+const authorReplyPrompt = core.buildPeerPrompt('Test intent', [{sender:'chatgpt',kind:'response',round:1,content:'Primary answer'},{sender:'claude',kind:'response',round:2,content:'Peer review'}], 'chatgpt');
+assert.match(authorReplyPrompt, /responding to Claude/i, 'subsequent ChatGPT turns must respond to the review');
+assert.ok(authorReplyPrompt.includes('Peer review'), 'ChatGPT response prompt must include Claude review');
+assert.throws(() => core.buildPeerPrompt('', [], 'chatgpt'), /Original intent is required/, 'peer prompt must require original intent');
+assert.throws(() => core.buildPeerPrompt('Test intent', [], 'unknown'), /Unsupported peer-review participant/, 'peer prompt must reject unsupported participants');
 const fixture = [
   {sender:'moderator', recipient:'chatgpt', content:'[technical dispatch envelope]', status:'approved'},
   {sender:'chatgpt', kind:'response', round:1, content:'ChatGPT answer'},
