@@ -340,8 +340,8 @@ const cancelStatus=await invoke(externalHandler,{protocolVersion:1,type:'CONSILI
 assert.equal(cancelStatus.status.pendingDispatches.some(x=>x.dispatchId===cancelId),false,'cancelled request must no longer appear as pending');
 
 const stopRaceId='c2345678-1234-1234-1234-123456789012';
-const raceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:stopRaceId}},sender);
-assert.equal(raceStage.ok,true,'approval-race request should stage');
+const stopRaceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:stopRaceId}},sender);
+assert.equal(stopRaceStage.ok,true,'approval-race request should stage');
 holdPrepare=true;
 const approvalInFlight=invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:stopRaceId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
 await prepareStarted;
