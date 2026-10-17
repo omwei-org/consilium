@@ -37,10 +37,31 @@ async function prepareNextContribution(){
  const provider=w.nextProvider||'chatgpt';let content;
  try{content=ConsiliumCore.buildPeerPrompt(active.intent,active.messages,provider);}catch(e){toast(e.message||'Prompt sa nepodarilo pripraviť.');return;}
  if(content.length>MAX_CONTENT_CHARS){toast('Kontext prekročil limit. Nič nebolo odoslané.');return;}
- const round=active.round+1;active.round=round;w.turn=(w.turn||0)+1;w.status='awaiting_response';
- active.pendingRound={round,status:'awaiting_manual_responses',mode:'peer_workflow',provider,promptContent:content,startedAt:iso(),updatedAt:iso(),dispatches:[]};
- try{await saveSession();renderActive();manualFallbackProvider=provider;$('manual-recipient').textContent=provider==='chatgpt'?'ChatGPT':'Claude';$('manual-content').value=content;$('manual-fallback').showModal();toast('Prompt pripravený pre '+(provider==='chatgpt'?'ChatGPT':'Claude')+'. Skontroluj ho a odošli ručne.');}
- catch(e){toast('Krok sa nepodarilo uložiť: '+e.message);}
+ const round=active.round+1,extId=extensionId();
+ active.round=round;w.turn=(w.turn||0)+1;w.status='awaiting_response';
+ active.pendingRound={round,status:'preparing',mode:'peer_workflow',provider,promptContent:content,startedAt:iso(),updatedAt:iso(),dispatches:[]};
+ try{
+  await saveSession();
+  if(!validExtensionId(extId)){
+   active.pendingRound.status='awaiting_manual_responses';
+   await saveSession();renderActive();manualFallbackProvider=provider;
+   $('manual-recipient').textContent=provider==='chatgpt'?'ChatGPT':'Claude';$('manual-content').value=content;$('manual-fallback').showModal();
+   toast('Rozšírenie nie je nakonfigurované. Prompt pripravný na manuálne skopírovanie.');return;
+  }
+  const dispatchId=uid(),contentHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(content)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const record={dispatchId,provider,round,status:'staging',createdAt:iso()};
+  active.pendingRound.dispatches.push(record);
+  active.messages.push({id:uid(),round,sender:'moderator',recipient:provider,content,createdAt:iso(),status:'staged_for_extension_approval'});
+  await saveSession();
+  const result=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{dispatchId,sessionId:active.id,roundId:String(round),recipient:provider,content,contentHash,attempt:1}});
+  if(!result?.ok)throw new Error(result?.error||'Extension did not confirm dispatch.');
+  record.status='awaiting_extension_approval';record.stagedAt=iso();active.pendingRound.status='awaiting_manual_responses';active.pendingRound.updatedAt=iso();
+  active.messages.push({id:uid(),round,sender:'system',recipient:provider,content:'Awaiting trusted approval in the Consilium Chrome Extension popup. After approval, review the text in the provider tab and click Send yourself.',createdAt:iso(),status:'awaiting_extension_approval'});
+  await saveSession();renderActive();toast(provider+' request staged. Open the Consilium toolbar popup to approve it.');
+ }catch(e){
+  if(active.pendingRound){active.pendingRound.status='interrupted';active.pendingRound.updatedAt=iso();const d=active.pendingRound.dispatches?.at(-1);if(d&&d.status==='staging'){d.status='unknown';d.error=e.message;}active.messages.push({id:uid(),round,sender:'system',recipient:provider,content:'Dispatch failed or outcome is unknown: '+e.message+' Do not retry automatically.',createdAt:iso(),status:'unknown'});await saveSession().catch(()=>{});renderActive();}
+  toast('Krok prerušený alebo výsledok odoslania neznámy. Skontroluj stav pred ďalším pokusom.');
+ }
 }
 $('workflow-continue').addEventListener('click',()=>prepareNextContribution().catch(e=>toast('Nepodarilo sa pripraviť ďalší krok: '+e.message)));
 $('workflow-stop').addEventListener('click',async()=>{
