@@ -346,6 +346,7 @@ extensionStorage.consiliumPendingDispatches={};
 const stopRaceId='c2345678-1234-1234-1234-123456789012';
 const stopRaceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:stopRaceId}},sender);
 assert.equal(stopRaceStage.ok,true,'approval-race request should stage');
+prepareStarted=new Promise(resolve=>{prepareStartedResolve=resolve;});
 holdPrepare=true;
 const approvalInFlight=invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:stopRaceId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
 await prepareStarted;
