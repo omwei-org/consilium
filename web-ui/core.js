@@ -43,5 +43,5 @@
   if(previous==='outcome_unknown'&&observed.status==='awaiting_extension_approval')return {status:previous,source:'local_state_preserved',reason:'stale_status_cannot_resolve_unknown',preserved:true};
   return observed;
  }
- root.ConsiliumCore=Object.freeze({MAX_CONTENT_CHARS,conversationContext,buildPrompt,isDuplicateResponse,reconcileDispatch});
+ root.ConsiliumCore=Object.freeze({MAX_CONTENT_CHARS,conversationContext,buildPrompt,buildPeerPrompt,isDuplicateResponse,reconcileDispatch});
 })(globalThis);
