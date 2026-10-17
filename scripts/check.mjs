@@ -67,7 +67,7 @@ assert.match(app, /async function saveManualResponse/, 'manual response capture 
 assert.match(app, /if\(!active\.pendingRound\|\|\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)\)/, 'response capture must reject attempts without an open round');
 assert.match(app, /const round=String\(active\.pendingRound\.round\)/, 'response capture must use the actual active round identifier');
 assert.match(app, /A response from '\+provider\+' is already saved for round '\+round/, 'each provider may contribute at most one captured response per round');
-assert.match(app, /This response is already saved for the current round/, 'duplicate response capture must be prevented');
+assert.match(app, /A response from '\+provider\+' is already saved for round '\+round/, 'duplicate response capture must be prevented');
 assert.match(html, /id="save-chatgpt"/, 'ChatGPT response control must exist in HTML');
 assert.match(html, /id="save-claude"/, 'Claude response control must exist in HTML');
 const bg = read('chrome-extension/background.js');
