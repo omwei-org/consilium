@@ -327,6 +327,8 @@ assert.equal(resolvedUnknown.ok,true,'trusted popup can record explicit manual i
 assert.equal(extensionStorage.consiliumDispatchAttempts[unknownId].state,'manually_reviewed','manual resolution must be durably recorded');
 const allowedAfterReview=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:'a2345678-1234-1234-1234-123456789012'}},sender);
 assert.equal(allowedAfterReview.ok,true,'new staging can resume only after manual review is recorded');
+const cleanupAllowed=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:'a2345678-1234-1234-1234-123456789012'}},sender);
+assert.equal(cleanupAllowed.ok,true,'test cleanup must remove the earlier allowed pending request');
 
 const cancelId='b2345678-1234-1234-1234-123456789012';
 const cancelStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:cancelId}},sender);
