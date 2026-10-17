@@ -3,6 +3,19 @@
  const MAX_CONTENT_CHARS=30000;
  function conversationContext(messages){return (messages||[]).filter(m=>m&&(m.kind==='response'||m.kind==='moderator_instruction'||m.sender==='chatgpt'||m.sender==='claude'||m.sender==='user')&&typeof m.content==='string').map(m=>'['+(m.sender||'moderator')+']\n'+m.content).join('\n\n');}
  function buildPrompt(intent,messages,instruction){const original=String(intent||'').trim();if(!original)throw new Error('Original intent is required.');const prior=conversationContext(messages);const note=String(instruction||'').trim();const prompt='You are participating in a moderated discussion. Respond independently and state assumptions and uncertainty. Do not assume you can see the other assistant unless its response is included below.\n\nORIGINAL INTENT\n'+original+'\n\nPRIOR CONTEXT\n'+(prior||'(No prior messages.)')+'\n\nMODERATOR INSTRUCTION FOR THIS ROUND\n'+(note||'Provide your best analysis of the original intent.');if(prompt.length>MAX_CONTENT_CHARS)throw new Error('Full context exceeds the supported size. Nothing was sent; export or start a separate session.');return prompt;}
+ function buildPeerPrompt(intent,messages,provider){
+  const original=String(intent||'').trim();if(!original)throw new Error('Original intent is required.');
+  if(provider!=='chatgpt'&&provider!=='claude')throw new Error('Unsupported peer-review participant.');
+  const prior=conversationContext(messages);
+  const latestChatGPT=[...(messages||[])].reverse().find(m=>m&&m.sender==='chatgpt'&&m.kind==='response'&&typeof m.content==='string');
+  let role;
+  if(provider==='chatgpt'&&!latestChatGPT) role='You are the primary author. Answer the original intent directly. State assumptions and uncertainty.';
+  else if(provider==='claude') role='You are the peer reviewer of ChatGPT’s latest answer. Review that answer against the original intent and the prior discussion. Identify substantive errors, omissions, unsupported assumptions, uncertainty, and useful improvements. Do not write a parallel standalone answer. Be fair and specific; distinguish definite errors from possible concerns.';
+  else role='You are the original author responding to Claude’s latest peer review. Address its specific points one by one. Acknowledge valid criticism, explain reasoned disagreement, and revise or clarify your answer where warranted. Do not blindly accept the review.';
+  const prompt='You are participating in an iterative, user-controlled peer-review discussion. Respond only in the role specified below.\n\nORIGINAL INTENT\n'+original+'\n\nPRIOR DISCUSSION\n'+(prior||'(No prior messages.)')+'\n\nYOUR ROLE\n'+role+'\n\nImportant: this is a sequential discussion, not a comparison of two independent answers. Do not claim to see context that is not included here.';
+  if(prompt.length>MAX_CONTENT_CHARS)throw new Error('Full context exceeds the supported size. Nothing was prepared; export or start a separate session.');
+  return prompt;
+ }
  function isDuplicateResponse(messages,provider,round,content){return (messages||[]).some(m=>m&&m.sender===provider&&m.kind==='response'&&String(m.round)===String(round)&&m.content===content);}
  function reconcileDispatch(dispatch,status){
   const id=dispatch&&dispatch.dispatchId;
