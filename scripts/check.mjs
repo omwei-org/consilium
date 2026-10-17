@@ -331,9 +331,9 @@ assert.equal(allowedAfterReview.ok,true,'new staging can resume only after manua
 const cancelId='b2345678-1234-1234-1234-123456789012';
 const cancelStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:cancelId}},sender);
 assert.equal(cancelStage.ok,true,'cancellation test request should stage');
-const cancelled=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:cancelId}},sender);
-assert.equal(cancelled.ok,true,'trusted site should be able to cancel an unapproved request');
-assert.equal(cancelled.status,'cancelled','extension must confirm pre-approval cancellation');
+const cancelResponse=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:cancelId}},sender);
+assert.equal(cancelResponse.ok,true,'trusted site should be able to cancel an unapproved request');
+assert.equal(cancelResponse.status,'cancelled','extension must confirm pre-approval cancellation');
 assert.equal(extensionStorage.consiliumPendingDispatches[cancelId],undefined,'cancelled request must be removed from extension pending queue');
 assert.equal(extensionStorage.consiliumDispatchAttempts[cancelId].state,'cancelled_before_approval','cancellation must be durably recorded');
 const cancelStatus=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
