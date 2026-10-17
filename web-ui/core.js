@@ -19,6 +19,7 @@
   if(prompt.length>MAX_CONTENT_CHARS)throw new Error('Full context exceeds the supported size. Nothing was prepared; export or start a separate session.');
   return prompt;
  }
+ function nextPeerProvider(messages){const latest=[...(messages||[])].reverse().find(m=>m&&m.kind==='response'&&(m.sender==='chatgpt'||m.sender==='claude'));return latest?.sender==='chatgpt'?'claude':'chatgpt';}
  function isDuplicateResponse(messages,provider,round,content){return (messages||[]).some(m=>m&&m.sender===provider&&m.kind==='response'&&String(m.round)===String(round)&&m.content===content);}
  function reconcileDispatch(dispatch,status){
   const id=dispatch&&dispatch.dispatchId;
@@ -46,5 +47,5 @@
   if(previous==='outcome_unknown'&&observed.status==='awaiting_extension_approval')return {status:previous,source:'local_state_preserved',reason:'stale_status_cannot_resolve_unknown',preserved:true};
   return observed;
  }
- root.ConsiliumCore=Object.freeze({MAX_CONTENT_CHARS,conversationContext,buildPrompt,buildPeerPrompt,isDuplicateResponse,reconcileDispatch});
+ root.ConsiliumCore=Object.freeze({MAX_CONTENT_CHARS,conversationContext,buildPrompt,buildPeerPrompt,nextPeerProvider,isDuplicateResponse,reconcileDispatch});
 })(globalThis);
