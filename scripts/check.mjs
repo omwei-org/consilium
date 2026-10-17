@@ -19,6 +19,24 @@ const coreSandbox = {};
 vm.runInNewContext(coreSource, { globalThis: coreSandbox });
 const core = coreSandbox.ConsiliumCore;
 assert.ok(core, 'core module must export the conversation helpers');
+assert.equal(typeof core.buildPeerPrompt, 'function', 'role-specific peer prompt builder must be exported');
+const firstPrompt = core.buildPeerPrompt('Test intent', [], 'chatgpt');
+assert.match(firstPrompt, /primary author/i, 'first ChatGPT turn must be the primary answer');
+const reviewPrompt = core.buildPeerPrompt('Test intent', [{sender:'chatgpt',kind:'response',round:1,content:'Primary answer'}], 'claude');
+assert.match(reviewPrompt, /peer reviewer/i, 'Claude must receive a peer-review role, not a parallel answer');
+assert.ok(reviewPrompt.includes('Primary answer'), 'Claude peer review must include the actual ChatGPT answer');
+const authorReplyPrompt = core.buildPeerPrompt('Test intent', [{sender:'chatgpt',kind:'response',round:1,content:'Primary answer'},{sender:'claude',kind:'response',round:2,content:'Peer review'}], 'chatgpt');
+assert.match(authorReplyPrompt, /responding to Claude/i, 'subsequent ChatGPT turns must respond to the review');
+assert.ok(authorReplyPrompt.includes('Peer review'), 'ChatGPT response prompt must include Claude review');
+assert.throws(() => core.buildPeerPrompt('', [], 'chatgpt'), /Original intent is required/, 'peer prompt must require original intent');
+assert.throws(() => core.buildPeerPrompt('Test intent', [], 'unknown'), /Unsupported peer-review participant/, 'peer prompt must reject unsupported participants');
+assert.throws(() => core.buildPeerPrompt('Test intent', [], 'claude'), /requires a saved ChatGPT response/, 'Claude review must not be prepared before a ChatGPT response is saved');
+const migratedChatGPT = [{sender:'chatgpt',kind:'response',round:1,content:'Existing primary answer'}];
+const migratedClaude = [...migratedChatGPT,{sender:'claude',kind:'response',round:2,content:'Existing peer review'}];
+assert.equal(core.nextPeerProvider([]),'chatgpt','an empty session must start with the primary ChatGPT answer');
+assert.equal(core.nextPeerProvider(migratedChatGPT),'claude','legacy sessions ending with ChatGPT must resume at Claude review');
+assert.equal(core.nextPeerProvider(migratedClaude),'chatgpt','legacy sessions ending with Claude must resume at ChatGPT author response');
+assert.equal(core.nextPeerProvider([...migratedClaude,{sender:'user',kind:'note',content:'not a response'}]),'chatgpt','non-response messages must not alter the peer workflow order');
 const fixture = [
   {sender:'moderator', recipient:'chatgpt', content:'[technical dispatch envelope]', status:'approved'},
   {sender:'chatgpt', kind:'response', round:1, content:'ChatGPT answer'},
@@ -85,6 +103,11 @@ assert.match(bg, /awaiting_extension_approval/, 'webpage requests must stage ins
 assert.match(app, /status:'awaiting_extension_approval'/, 'hosted UI must not report staged requests as already prepared');
 assert.match(app, /stagedDispatches\.push\(\{dispatchId,provider:item\.provider,round:item\.round\}\)/, 'hosted UI must track staged dispatch IDs');
 assert.match(app, /type:'CONSILIUM_CANCEL_DISPATCH',payload:\{dispatchId:item\.dispatchId\}/, 'cancelled rounds must attempt to cancel pending extension requests');
+assert.match(app, /if\(pending\?\.mode==='peer_workflow'&&Array\.isArray\(pending\.dispatches\)\)[\s\S]*?if\(!\['staging','awaiting_extension_approval'\]\.includes\(d\.status\)\)continue/, 'STOP must inspect only pending peer-workflow dispatches for cancellation');
+assert.match(app, /d\.status='cancelled_before_approval'/, 'STOP must record confirmed extension cancellation in the session');
+assert.match(app, /if\(w\.status==='stopped'\)\{renderActive\(\);return;\}/, 'a stopped workflow must not continue staging after the initial save');
+assert.match(app, /if\(w\.status==='stopped'\)\{[\s\S]*?CONSILIUM_CANCEL_DISPATCH[\s\S]*?record\.status==='cancelled_before_approval'/, 'if STOP races with extension staging, the newly staged request must be cancelled or marked uncertain');
+assert.match(app, /if\(needsInspection\)toast\('Diskusia zastavená[\s\S]*?Skontroluj popup rozšírenia a kartu poskytovateľa/, 'STOP must warn when pending dispatch cancellation cannot be confirmed');
 assert.match(app, /could not be confirmed cancelled/, 'failed remote cancellation must be surfaced to the moderator');
 assert.match(app, /pendingRound=\{round,status:'preparing'/, 'round recovery state must be persisted before dispatch begins');
 assert.match(html, /Reconcile extension state/, 'recovery UI must offer extension reconciliation');
@@ -124,7 +147,7 @@ assert.match(app, /mode:'manual_fallback',promptContent:content/, 'manual fallba
 assert.match(app, /content=current\.promptContent/, 'the second provider must receive the same prompt after refresh or a first response');
 assert.match(app, /Resolve the active extension round first/, 'manual fallback must not bypass an unresolved extension dispatch');
 assert.match(app, /active\.messages\.push\(\{id:uid\(\),round,sender:'moderator',kind:'moderator_instruction'/, 'manual-round moderator instructions must be recorded for later context');
-assert.match(app, /mode!=='manual_fallback'&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)/, 'manual rounds must not show extension-recovery controls');
+assert.match(app, /mode!=='manual_fallback'&&\(active\.pendingRound\.mode!=='peer_workflow'\|\|active\.pendingRound\.status==='interrupted'\)&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)/, 'manual and ordinary peer-review steps must not show extension-recovery controls');
 assert.ok(app.includes('navigator.clipboard.writeText(content)'), 'manual fallback must offer clipboard copy');
 assert.ok(app.includes('Could not access clipboard. Prompt selected; copy it manually.'), 'manual fallback must work when clipboard access is unavailable');
 
@@ -304,6 +327,38 @@ assert.equal(resolvedUnknown.ok,true,'trusted popup can record explicit manual i
 assert.equal(extensionStorage.consiliumDispatchAttempts[unknownId].state,'manually_reviewed','manual resolution must be durably recorded');
 const allowedAfterReview=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:'a2345678-1234-1234-1234-123456789012'}},sender);
 assert.equal(allowedAfterReview.ok,true,'new staging can resume only after manual review is recorded');
+const cleanupAllowed=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:'a2345678-1234-1234-1234-123456789012'}},sender);
+assert.equal(cleanupAllowed.ok,true,'test cleanup must remove the earlier allowed pending request');
+
+const cancelId='b2345678-1234-1234-1234-123456789012';
+const cancelStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:cancelId}},sender);
+assert.equal(cancelStage.ok,true,'cancellation test request should stage');
+const cancelResponse=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:cancelId}},sender);
+assert.equal(cancelResponse.ok,true,'trusted site should be able to cancel an unapproved request');
+assert.equal(cancelResponse.status,'cancelled','extension must confirm pre-approval cancellation');
+assert.equal(extensionStorage.consiliumPendingDispatches[cancelId],undefined,'cancelled request must be removed from extension pending queue');
+assert.equal(extensionStorage.consiliumDispatchAttempts[cancelId].state,'cancelled_before_approval','cancellation must be durably recorded');
+const cancelStatus=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
+assert.equal(cancelStatus.status.pendingDispatches.some(x=>x.dispatchId===cancelId),false,'cancelled request must no longer appear as pending');
+
+// Isolate this race scenario from pending requests left by earlier protocol assertions.
+extensionStorage.consiliumPendingDispatches={};
+const stopRaceId='c2345678-1234-1234-1234-123456789012';
+const stopRaceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:stopRaceId}},sender);
+assert.equal(stopRaceStage.ok,true,'approval-race request should stage');
+prepareStarted=new Promise(resolve=>{prepareStartedResolve=resolve;});
+holdPrepare=true;
+const approvalInFlight=invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:stopRaceId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+await prepareStarted;
+const refusedCancel=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:stopRaceId}},sender);
+assert.equal(refusedCancel.ok,false,'extension must not claim cancellation once approval is in flight');
+assert.match(refusedCancel.error,/cannot be guaranteed|in progress/i,'in-flight cancellation refusal must explain the race');
+releasePrepare();
+const raceApprovalResult=await approvalInFlight;
+assert.equal(raceApprovalResult.ok,true,'approved request should complete its existing manual-preparation path');
+assert.equal(extensionStorage.consiliumDispatchAttempts[stopRaceId].state,'prepared_for_manual_send','race must not be misrecorded as cancelled');
+holdPrepare=false;
+
 
 console.log('Behavioral extension protocol tests passed.');
 
