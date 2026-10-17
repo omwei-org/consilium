@@ -14,6 +14,15 @@ Status: **not yet executed against live provider UIs**. This checklist is the ac
 
 Do not proceed if Chrome reports extension errors or if the extension ID/origin is not the expected one.
 
+## 0. Deployment smoke check (only if testing the hosted site)
+
+- [ ] 0A — Record the exact URL and deployment source/commit supplied by the hosting platform. Do not assume that merging a PR automatically deploys to `omwei.tech`.
+- [ ] 0B — Open the hosted URL in a fresh tab and verify the Consilium page loads with no missing CSS/JS requests or browser console errors.
+- [ ] 0C — Verify the page's build/source commit matches the intended release. If there is no visible build identifier, confirm it in the hosting provider's deployment log.
+- [ ] 0D — Confirm the extension ID configured in Settings is the installed extension ID and the deployed origin is listed in `externally_connectable.matches`.
+- [ ] 0E — Verify session history stays in the browser's IndexedDB and no conversation content is sent to a Consilium backend.
+- [ ] 0F — If the hosted page is unavailable or the served version cannot be identified, mark deployment as BLOCKED; run local smoke tests instead and do not infer deployment success.
+
 ## Test cases
 
 For each case record **PASS**, **FAIL**, or **BLOCKED**, and attach a redacted screenshot or console error where useful. Never include private prompt/response contents in an issue report.
