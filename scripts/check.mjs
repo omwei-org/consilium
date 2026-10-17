@@ -339,19 +339,19 @@ assert.equal(extensionStorage.consiliumDispatchAttempts[cancelId].state,'cancell
 const cancelStatus=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
 assert.equal(cancelStatus.status.pendingDispatches.some(x=>x.dispatchId===cancelId),false,'cancelled request must no longer appear as pending');
 
-const raceId='c2345678-1234-1234-1234-123456789012';
-const raceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:raceId}},sender);
+const stopRaceId='c2345678-1234-1234-1234-123456789012';
+const raceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:stopRaceId}},sender);
 assert.equal(raceStage.ok,true,'approval-race request should stage');
 holdPrepare=true;
-const approvalInFlight=invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:raceId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
+const approvalInFlight=invoke(internalHandler,{protocolVersion:1,type:'CONSILIUM_POPUP_APPROVE',dispatchId:stopRaceId},{id:chromeMock.runtime.id,url:'chrome-extension://'+chromeMock.runtime.id+'/popup.html'});
 await prepareStarted;
-const refusedCancel=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:raceId}},sender);
+const refusedCancel=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:stopRaceId}},sender);
 assert.equal(refusedCancel.ok,false,'extension must not claim cancellation once approval is in flight');
 assert.match(refusedCancel.error,/cannot be guaranteed|in progress/i,'in-flight cancellation refusal must explain the race');
 releasePrepare();
 const raceApprovalResult=await approvalInFlight;
 assert.equal(raceApprovalResult.ok,true,'approved request should complete its existing manual-preparation path');
-assert.equal(extensionStorage.consiliumDispatchAttempts[raceId].state,'prepared_for_manual_send','race must not be misrecorded as cancelled');
+assert.equal(extensionStorage.consiliumDispatchAttempts[stopRaceId].state,'prepared_for_manual_send','race must not be misrecorded as cancelled');
 holdPrepare=false;
 
 
