@@ -135,7 +135,7 @@ assert.match(app, /mode:'manual_fallback',promptContent:content/, 'manual fallba
 assert.match(app, /content=current\.promptContent/, 'the second provider must receive the same prompt after refresh or a first response');
 assert.match(app, /Resolve the active extension round first/, 'manual fallback must not bypass an unresolved extension dispatch');
 assert.match(app, /active\.messages\.push\(\{id:uid\(\),round,sender:'moderator',kind:'moderator_instruction'/, 'manual-round moderator instructions must be recorded for later context');
-assert.match(app, /mode!=='manual_fallback'&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)/, 'manual rounds must not show extension-recovery controls');
+assert.match(app, /mode!=='manual_fallback'&&\(active\.pendingRound\.mode!=='peer_workflow'\|\|active\.pendingRound\.status==='interrupted'\)&&!\['complete','abandoned'\]\.includes\(active\.pendingRound\.status\)/, 'manual and ordinary peer-review steps must not show extension-recovery controls');
 assert.ok(app.includes('navigator.clipboard.writeText(content)'), 'manual fallback must offer clipboard copy');
 assert.ok(app.includes('Could not access clipboard. Prompt selected; copy it manually.'), 'manual fallback must work when clipboard access is unavailable');
 
