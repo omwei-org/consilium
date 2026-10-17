@@ -42,6 +42,7 @@ async function prepareNextContribution(){
  active.pendingRound={round,status:'preparing',mode:'peer_workflow',provider,promptContent:content,startedAt:iso(),updatedAt:iso(),dispatches:[]};
  try{
   await saveSession();
+  if(w.status==='stopped'){renderActive();return;}
   if(!validExtensionId(extId)){
    active.pendingRound.status='awaiting_manual_responses';
    await saveSession();renderActive();manualFallbackProvider=provider;
@@ -56,6 +57,12 @@ async function prepareNextContribution(){
   const result=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{dispatchId,sessionId:active.id,roundId:String(round),recipient:provider,content,contentHash,attempt:1}});
   if(!result?.ok)throw new Error(result?.error||'Extension did not confirm dispatch.');
   record.status='awaiting_extension_approval';record.stagedAt=iso();active.pendingRound.status='awaiting_manual_responses';active.pendingRound.updatedAt=iso();
+  if(w.status==='stopped'){
+   try{const cancel=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId}});if(cancel?.ok&&cancel.status==='cancelled'){record.status='cancelled_before_approval';record.cancelledAt=iso();}else{record.status='unknown';record.cancelError=cancel?.error||'Cancellation was not confirmed';}}
+   catch(cancelError){record.status='unknown';record.cancelError=cancelError.message||'Cancellation outcome unknown';}
+   active.messages.push({id:uid(),round,sender:'system',recipient:provider,content:record.status==='cancelled_before_approval'?'The discussion was stopped before approval; the staged request was cancelled.':'The discussion was stopped, but cancellation of the staged request could not be confirmed. Inspect the extension popup and provider tab manually.',createdAt:iso(),status:record.status});
+   await saveSession();renderActive();toast(record.status==='cancelled_before_approval'?'Diskusia bola zastavená; čakajúca požiadavka bola zrušená.':'Diskusia bola zastavená, ale zrušenie požiadavky nie je potvrdené. Skontroluj rozšírenie a kartu poskytovateľa.');return;
+  }
   active.messages.push({id:uid(),round,sender:'system',recipient:provider,content:'Awaiting trusted approval in the Consilium Chrome Extension popup. After approval, review the text in the provider tab and click Send yourself.',createdAt:iso(),status:'awaiting_extension_approval'});
   await saveSession();renderActive();toast(provider+' request staged. Open the Consilium toolbar popup to approve it.');
  }catch(e){
