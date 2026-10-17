@@ -31,6 +31,10 @@ assert.ok(authorReplyPrompt.includes('Peer review'), 'ChatGPT response prompt mu
 assert.throws(() => core.buildPeerPrompt('', [], 'chatgpt'), /Original intent is required/, 'peer prompt must require original intent');
 assert.throws(() => core.buildPeerPrompt('Test intent', [], 'unknown'), /Unsupported peer-review participant/, 'peer prompt must reject unsupported participants');
 assert.throws(() => core.buildPeerPrompt('Test intent', [], 'claude'), /requires a saved ChatGPT response/, 'Claude review must not be prepared before a ChatGPT response is saved');
+const migratedChatGPT = [{sender:'chatgpt',kind:'response',round:1,content:'Existing primary answer'}];
+const migratedClaude = [...migratedChatGPT,{sender:'claude',kind:'response',round:2,content:'Existing peer review'}];
+assert.equal([...migratedChatGPT].reverse().find(m=>m&&m.kind==='response'&&(m.sender==='chatgpt'||m.sender==='claude'))?.sender==='chatgpt'?'claude':'chatgpt','claude','legacy sessions ending with ChatGPT must resume at Claude review');
+assert.equal([...migratedClaude].reverse().find(m=>m&&m.kind==='response'&&(m.sender==='chatgpt'||m.sender==='claude'))?.sender==='chatgpt'?'claude':'chatgpt','chatgpt','legacy sessions ending with Claude must resume at ChatGPT author response');
 const fixture = [
   {sender:'moderator', recipient:'chatgpt', content:'[technical dispatch envelope]', status:'approved'},
   {sender:'chatgpt', kind:'response', round:1, content:'ChatGPT answer'},
