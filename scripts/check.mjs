@@ -105,6 +105,8 @@ assert.match(app, /stagedDispatches\.push\(\{dispatchId,provider:item\.provider,
 assert.match(app, /type:'CONSILIUM_CANCEL_DISPATCH',payload:\{dispatchId:item\.dispatchId\}/, 'cancelled rounds must attempt to cancel pending extension requests');
 assert.match(app, /if\(pending\?\.mode==='peer_workflow'&&Array\.isArray\(pending\.dispatches\)\)[\s\S]*?if\(!\['staging','awaiting_extension_approval'\]\.includes\(d\.status\)\)continue/, 'STOP must inspect only pending peer-workflow dispatches for cancellation');
 assert.match(app, /d\.status='cancelled_before_approval'/, 'STOP must record confirmed extension cancellation in the session');
+assert.match(app, /if\(w\.status==='stopped'\)\{renderActive\(\);return;\}/, 'a stopped workflow must not continue staging after the initial save');
+assert.match(app, /if\(w\.status==='stopped'\)\{[\s\S]*?CONSILIUM_CANCEL_DISPATCH[\s\S]*?record\.status==='cancelled_before_approval'/, 'if STOP races with extension staging, the newly staged request must be cancelled or marked uncertain');
 assert.match(app, /if\(needsInspection\)toast\('Diskusia zastavená[\s\S]*?Skontroluj popup rozšírenia a kartu poskytovateľa/, 'STOP must warn when pending dispatch cancellation cannot be confirmed');
 assert.match(app, /could not be confirmed cancelled/, 'failed remote cancellation must be surfaced to the moderator');
 assert.match(app, /pendingRound=\{round,status:'preparing'/, 'round recovery state must be persisted before dispatch begins');
