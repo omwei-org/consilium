@@ -341,6 +341,8 @@ assert.equal(extensionStorage.consiliumDispatchAttempts[cancelId].state,'cancell
 const cancelStatus=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_GET_STATUS'},sender);
 assert.equal(cancelStatus.status.pendingDispatches.some(x=>x.dispatchId===cancelId),false,'cancelled request must no longer appear as pending');
 
+// Isolate this race scenario from pending requests left by earlier protocol assertions.
+extensionStorage.consiliumPendingDispatches={};
 const stopRaceId='c2345678-1234-1234-1234-123456789012';
 const stopRaceStage=await invoke(externalHandler,{protocolVersion:1,type:'CONSILIUM_CONFIRM_DISPATCH',payload:{...payload,dispatchId:stopRaceId}},sender);
 assert.equal(stopRaceStage.ok,true,'approval-race request should stage');
