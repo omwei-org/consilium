@@ -66,10 +66,27 @@ async function prepareNextContribution(){
 $('workflow-continue').addEventListener('click',()=>prepareNextContribution().catch(e=>toast('Nepodarilo sa pripraviť ďalší krok: '+e.message)));
 $('workflow-stop').addEventListener('click',async()=>{
  if(!active?.workflow||active.workflow.status==='stopped')return;
- if(!confirm('Zastaviť diskusiu? Všetky zaznamenané príspevky zostanú v lokálnej histórii.'))return;
+ if(!confirm('Zastaviť diskusiu? História zostane zachovaná. Čakajúce požiadavky sa zrušia, ak ešte neboli schválené.'))return;
  active.workflow.status='stopped';active.workflow.stoppedAt=iso();
  active.messages.push({id:uid(),round:active.pendingRound?.round??active.round,sender:'system',kind:'workflow_resolution',content:'Moderator stopped the iterative peer-review discussion. Existing history was preserved; no delivery outcome was inferred.',createdAt:iso(),status:'stopped'});
- await saveSession();renderActive();toast('Diskusia zastavená. História zostala uložená.');
+ await saveSession();
+ let cancelled=0,needsInspection=0;
+ const pending=active.pendingRound,extId=extensionId();
+ if(pending?.mode==='peer_workflow'&&Array.isArray(pending.dispatches)){
+  for(const d of pending.dispatches){
+   if(!['staging','awaiting_extension_approval'].includes(d.status))continue;
+   if(!validExtensionId(extId)||!globalThis.chrome?.runtime?.sendMessage){needsInspection++;continue;}
+   try{
+    const result=await chrome.runtime.sendMessage(extId,{protocolVersion:1,type:'CONSILIUM_CANCEL_DISPATCH',payload:{dispatchId:d.dispatchId}});
+    if(result?.ok&&result.status==='cancelled'){d.status='cancelled_before_approval';d.cancelledAt=iso();cancelled++;}
+    else{d.cancelError=result?.error||'Cancellation was not confirmed';needsInspection++;}
+   }catch(e){d.cancelError=e.message||'Cancellation outcome unknown';needsInspection++;}
+  }
+  if(cancelled)await saveSession();
+ }
+ renderActive();
+ if(needsInspection)toast('Diskusia zastavená, história uložená. Niektoré požiadavky sa nepodarilo potvrdene zrušiť ('+needsInspection+'). Skontroluj popup rozšírenia a kartu poskytovateľa; nič sa nebude opakovať automaticky.');
+ else toast('Diskusia zastavená. História zostala uložená.'+(cancelled?' Zrušené čakajúce požiadavky: '+cancelled+'.':''));
 });
 
 function confirmOne(provider,content){return new Promise(resolve=>{approvalResolve=resolve;$('recipient').textContent=provider==='chatgpt'?'ChatGPT':'Claude';$('approval-content').textContent=content;$('approval').showModal();});}
