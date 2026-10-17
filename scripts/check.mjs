@@ -30,6 +30,7 @@ assert.match(authorReplyPrompt, /responding to Claude/i, 'subsequent ChatGPT tur
 assert.ok(authorReplyPrompt.includes('Peer review'), 'ChatGPT response prompt must include Claude review');
 assert.throws(() => core.buildPeerPrompt('', [], 'chatgpt'), /Original intent is required/, 'peer prompt must require original intent');
 assert.throws(() => core.buildPeerPrompt('Test intent', [], 'unknown'), /Unsupported peer-review participant/, 'peer prompt must reject unsupported participants');
+assert.throws(() => core.buildPeerPrompt('Test intent', [], 'claude'), /requires a saved ChatGPT response/, 'Claude review must not be prepared before a ChatGPT response is saved');
 const fixture = [
   {sender:'moderator', recipient:'chatgpt', content:'[technical dispatch envelope]', status:'approved'},
   {sender:'chatgpt', kind:'response', round:1, content:'ChatGPT answer'},
